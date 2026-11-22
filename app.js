@@ -62,20 +62,28 @@ function richText(text, photos) {
   return html + esc(s.slice(last));
 }
 
-function stars(r) {
+// 評価: 数字・意味の言葉・線
+function rateLabel(r) { var n = Math.round(Number(r) || 0), g = RATE_GUIDE.filter(function(x) { return x[0] === n; })[0]; return g ? g[1] : ''; }
+function ratingBlock(r, cls) {
   var n = Number(r) || 0;
-  return n > 0 ? '<span class="stars" aria-label="評価 ' + n + '">' + n.toFixed(1) + '<i style="--p:' + Math.min(100, n * 20) + '%"></i></span>' : '<span class="muted">—</span>';
+  return n > 0 ? '<div class="rb ' + (cls || '') + '" aria-label="評価 ' + n.toFixed(1) + '"><b>' + n.toFixed(1) + '</b><span><em>' + esc(rateLabel(n)) + '</em><i style="--p:' + Math.min(100, n * 20) + '%"></i></span></div>' : '<div class="rb none ' + (cls || '') + '">未評価</div>';
 }
 
 // 5 項目の軽いレーダー図（0 は未評価）
 function radar(labels, values, size) {
   if (!labels.length || !values.some(function(v) { return Number(v) > 0; })) return '';
-  var c = 60, R = 36, pt = function(i, r) { var a = -Math.PI / 2 + i * 2 * Math.PI / labels.length; return [(c + Math.cos(a) * r).toFixed(1), (c + Math.sin(a) * r).toFixed(1)]; };
+  var cx = 90, cy = 70, R = 46, n = labels.length, pt = function(i, r) { var a = -Math.PI / 2 + i * 2 * Math.PI / n; return [(cx + Math.cos(a) * r).toFixed(1), (cy + Math.sin(a) * r).toFixed(1)]; };
   var poly = function(f) { return labels.map(function(_, i) { return pt(i, f(i)).join(','); }).join(' '); };
-  var svg = '<svg class="radar" viewBox="0 0 120 120" width="' + size + '" height="' + size + '" role="img" aria-label="' + esc(labels.map(function(l, i) { return l + ' ' + (Number(values[i]) || '-'); }).join('、')) + '">';
-  [1, 0.6, 0.2].forEach(function(k) { svg += '<polygon class="grid" points="' + poly(function() { return R * k; }) + '"/>'; });
+  var svg = '<svg class="radar" viewBox="0 -8 180 146" width="' + size + '" height="' + Math.round(size * 146 / 180) + '" role="img" aria-label="' + esc(labels.map(function(l, i) { return l + ' ' + (Number(values[i]) || '-'); }).join('、')) + '">';
+  [1, 0.8, 0.6, 0.4, 0.2].forEach(function(k) { svg += '<polygon class="grid" points="' + poly(function() { return R * k; }) + '"/>'; });
+  labels.forEach(function(_, i) { var p = pt(i, R); svg += '<line class="axis" x1="' + cx + '" y1="' + cy + '" x2="' + p[0] + '" y2="' + p[1] + '"/>'; });
   svg += '<polygon class="val" points="' + poly(function(i) { return R * (Number(values[i]) || 0) / 5; }) + '"/>';
-  labels.forEach(function(l, i) { var p = pt(i, R + 11); svg += '<text x="' + p[0] + '" y="' + p[1] + '">' + esc(l.slice(0, 5)) + '</text>'; });
+  labels.forEach(function(l, i) {
+    var v = Number(values[i]) || 0, d = pt(i, R * v / 5), p = pt(i, R + 9), dx = p[0] - cx, anchor = Math.abs(dx) < 8 ? 'middle' : dx > 0 ? 'start' : 'end';
+    var y = Math.abs(dx) < 8 ? p[1] - 8 : p[1];
+    if (v) svg += '<circle class="dot" cx="' + d[0] + '" cy="' + d[1] + '" r="2"/>';
+    svg += '<text x="' + p[0] + '" y="' + y + '" text-anchor="' + anchor + '">' + esc(l.length > 6 ? l.slice(0, 5) + '…' : l) + '<tspan class="n" x="' + p[0] + '" dy="10">' + (v || '—') + '</tspan></text>';
+  });
   return svg + '</svg>';
 }
 
@@ -999,7 +1007,7 @@ RENDER.logList = function() {
   var page = l.slice(0, LV.shown), html = '';
   if (LV.view === 'photo') html = '<div class="pgrid">' + page.map(function(x) {
     var p = photosOf(x);
-    return '<button type="button" class="pcell" data-act="logOpen" data-id="' + esc(x.id) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="nophoto">' + esc(String(x.memo || '').slice(0, 40)) + '</span>') + (p.length > 1 ? '<span class="cnt">' + p.length + '</span>' : '') + '<span class="cap">' + esc(x.title || '無題') + (x.rating ? '<em>' + esc(Number(x.rating).toFixed(1)) + '</em>' : '') + '</span></button>';
+    return '<button type="button" class="pcell" data-act="logOpen" data-id="' + esc(x.id) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="nophoto">' + esc(String(x.memo || '').slice(0, 40)) + '</span>') + (p.length > 1 ? '<span class="cnt">' + p.length + '</span>' : '') + '<span class="cap">' + esc(x.title || '無題') + '</span>' + (x.rating ? '<span class="score">' + esc(Number(x.rating).toFixed(1)) + '</span>' : '') + '</button>';
   }).join('') + '</div>';
   else if (LV.view === 'table') html = '<div class="tbl"><table><thead><tr><th>日付</th><th>タイトル</th><th>評価</th><th>分類</th><th>中分類</th><th>価格</th><th>投稿者</th></tr></thead><tbody>' + page.map(function(x) {
     return '<tr data-act="logOpen" data-id="' + esc(x.id) + '" tabindex="0"><td>' + esc(dateKey(x.timestamp).slice(0, 10)) + '</td><td>' + esc(x.title) + '</td><td>' + (x.rating ? esc(Number(x.rating).toFixed(1)) : '—') + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.subCategory || '-') + '</td><td>' + esc(x.price || '-') + '</td><td>' + esc(x.author) + '</td></tr>';
@@ -1023,18 +1031,22 @@ ACT.longToggle = function(el) {
   el.textContent = on ? '閉じる' : '続きを読む';
   if (on) watchPhotos(box); else box.closest('article').scrollIntoView({ block: 'nearest' });
 };
-function headRow(x, ix) {
-  return '<div class="row between"><span class="muted ell">' + esc(dateLabel(x.timestamp)) + '・' + esc(x.category) + (x.subCategory ? ' / ' + esc(x.subCategory) : '') + '</span><span class="muted">' + esc(x.author) + '</span></div><h2 class="tap" data-act="logOpen" data-id="' + esc(x.id) + '">' + esc(x.title || '無題') + '</h2><div class="row">' + stars(x.rating) + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</div>';
+function catLine(x) { return '<span class="cats"><b>' + esc(x.category || '未分類') + '</b>' + (x.subCategory ? '<span>' + esc(x.subCategory) + '</span>' : '') + '</span>'; }
+function scoreLine(x) {
+  var l = catOf(x.category).scores, v = scoresOf(x);
+  return l.length && v.some(function(s) { return s > 0; }) ? '<div class="scoreline">' + l.map(function(t, i) { return '<span>' + esc(t) + '<b>' + (v[i] || '—') + '</b></span>'; }).join('') + '</div>' : '';
 }
 function blogCard(x, ix) {
-  var p = photosOf(x);
-  return '<article class="card" data-id="' + esc(x.id) + '">' + headRow(x, ix) + (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') + longText(x.memo, p, 'log:' + x.id, 8) + taglist('log', x) + (x.address ? '<div class="muted ell">' + esc(x.address) + '</div>' : '') + '</article>';
+  var p = photosOf(x), id = esc(x.id);
+  return '<article class="card blog" data-id="' + id + '"><div class="row between">' + catLine(x) + '<span class="muted">' + esc(dateLabel(x.timestamp)) + '</span></div><h2 class="ttl tap" data-act="logOpen" data-id="' + id + '">' + esc(x.title || '無題') + '</h2><div class="row between wrap">' + ratingBlock(x.rating) + '<span class="row">' + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</span></div>' + scoreLine(x) +
+    (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') + longText(x.memo, p, 'log:' + x.id, 8) + taglist('log', x) +
+    '<div class="row between foot"><span class="muted ell">' + esc(x.address) + '</span><span class="muted">' + esc(x.author) + '</span></div></article>';
 }
 function dataCard(x, ix) {
-  var p = photosOf(x), m = MAP_MARK[x.category] || ['記', 7], labels = catOf(x.category).scores, sc = scoresOf(x);
-  return '<article class="card dcard" data-id="' + esc(x.id) + '"><button type="button" class="dthumb" data-act="logOpen" data-id="' + esc(x.id) + '" aria-label="' + esc(x.title) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="pin pin-' + m[1] + '">' + m[0] + '</span>') + '</button>' +
-    '<div class="dbody"><div class="muted ell">' + esc(dateLabel(x.timestamp)) + '・' + esc(x.author) + '</div><h3 class="tap ell2" data-act="logOpen" data-id="' + esc(x.id) + '">' + esc(x.title || '無題') + '</h3><div class="muted ell">' + esc([x.category, x.subCategory, x.price].filter(Boolean).join('・')) + '</div><div class="row wrap">' + stars(x.rating) + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</div></div>' +
-    (labels.length && sc.some(function(s) { return s > 0; }) ? '<div class="bars">' + labels.map(function(t, i) { var s = Number(sc[i]) || 0; return '<div><span class="ell">' + esc(t) + '</span><em><i style="width:' + Math.min(100, s * 20) + '%"></i></em><b>' + (s || '-') + '</b></div>'; }).join('') + '</div>' : '') + '</article>';
+  var p = photosOf(x), m = MAP_MARK[x.category] || ['記', 7], id = esc(x.id), chart = radar(catOf(x.category).scores, scoresOf(x), 178);
+  return '<article class="card dcard" data-id="' + id + '"><div class="dtop"><button type="button" class="dthumb" data-act="logOpen" data-id="' + id + '" aria-label="' + esc(x.title) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="pin pin-' + m[1] + '">' + m[0] + '</span>') + '</button>' +
+    '<div class="dbody">' + catLine(x) + '<h2 class="ttl tap ell2" data-act="logOpen" data-id="' + id + '">' + esc(x.title || '無題') + '</h2><div class="muted ell">' + esc([dateLabel(x.timestamp), x.author, x.price].filter(Boolean).join('・')) + '</div><div class="row wrap">' + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</div></div></div>' +
+    '<div class="dscore">' + ratingBlock(x.rating, 'big') + chart + '</div>' + taglist('log', x) + '</article>';
 }
 
 
@@ -1058,14 +1070,16 @@ ACT.logOpen = function(el) { openLog(el.dataset.id); };
 function openLog(id) {
   var x = store.get('log', id);
   if (!x) return;
-  var p = photosOf(x), labels = catOf(x.category).scores, r = radar(labels, scoresOf(x), 150);
-  var q = [x.title, x.address].filter(Boolean).join(' ');
-  openSheet(x.title || '無題', '<div data-id="' + esc(id) + '">' + headRow(x, visitIndex()) +
-    (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') +
-    (r ? '<div class="row">' + r + '<div class="muted">' + labels.map(function(t, i) { return esc(t) + ' ' + (scoresOf(x)[i] || '-'); }).join('<br>') + '</div></div>' : '') +
-    (x.price ? '<p class="muted">' + esc(x.price) + '</p>' : '') + (x.memo ? '<div class="text full">' + richText(x.memo, p) + '</div>' : '') + taglist('log', x) +
-    (x.address || x.lat ? '<p><a href="' + esc(mapUrl(x.address ? q : x.lat + ',' + x.lng)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.address || '地図で見る') + '</a>' + (x.lat ? ' <button type="button" class="btn small" data-act="openMap" data-layer="log" data-id="' + esc(id) + '">地図</button>' : '') + '</p>' : '') +
-    '<div class="form-foot"><button type="button" class="btn danger" data-act="logTrash">ゴミ箱へ</button><button type="button" class="btn primary" data-act="logEdit">編集</button></div></div>');
+  var p = photosOf(x), labels = catOf(x.category).scores, chart = radar(labels, scoresOf(x), 220), tags = tagsOf('log', x), q = [x.title, x.address].filter(Boolean).join(' ');
+  var item = function(k, v) { return '<div><dt>' + k + '</dt><dd>' + (v || '<span class="muted">—</span>') + '</dd></div>'; };
+  var place = x.address || x.lat ? '<a href="' + esc(mapUrl(x.address ? q : x.lat + ',' + x.lng)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.address || '座標あり') + '</a>' + (x.lat ? ' <button type="button" class="btn small" data-act="openMap" data-layer="log" data-id="' + esc(id) + '">地図</button>' : '') : '';
+  openSheet('記録', '<div class="detail" data-id="' + esc(id) + '">' +
+    (p.length ? '<div class="blog-photos hero ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') +
+    '<div class="row between">' + catLine(x) + '<span class="row">' + visitBadge(x, visitIndex()) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</span></div><h2 class="ttl big">' + esc(x.title || '無題') + '</h2><p class="muted">' + esc(dateLabel(x.timestamp)) + ' ' + esc(dateKey(x.timestamp).slice(11)) + '・' + esc(x.author) + '</p>' +
+    '<div class="card dscore">' + ratingBlock(x.rating, 'big') + chart + '</div>' +
+    '<dl class="facts">' + item('大分類', esc(x.category)) + item('中分類', esc(x.subCategory)) + item('タグ', tags.length ? '<span class="taglist">' + tagButtons(tags) + '</span>' : '') + (catOf(x.category).prices.length || x.price ? item(x.category === 'レシピ' ? '所要時間' : '価格帯', esc(x.price)) : '') + item('場所', place) + '</dl>' +
+    (x.memo ? '<div class="text full">' + richText(x.memo, p) + '</div>' : '') +
+    '<div class="form-foot stick"><button type="button" class="btn danger" data-act="logTrash">ゴミ箱へ</button><button type="button" class="btn primary" data-act="logEdit">編集</button></div></div>');
 }
 ACT.logTrash = function(el) { var id = el.closest('[data-id]').dataset.id; closeSheet(); trashItem('log', id); };
 ACT.logEdit = function(el) { var id = el.closest('[data-id]').dataset.id; closeSheet(); openLogForm({ id: id }); };
@@ -1073,7 +1087,7 @@ ACT.logEdit = function(el) { var id = el.closest('[data-id]').dataset.id; closeS
 ACT.visits = function(el) {
   var l = store.get('log', el.dataset.id), k = normKey(l.title), v = sortedLogs().filter(function(x) { return normKey(x.title) === k; }).reverse();
   var rated = v.filter(function(x) { return x.rating > 0; }), avg = rated.length ? (rated.reduce(function(s, x) { return s + x.rating; }, 0) / rated.length).toFixed(1) : '-';
-  openSheet(l.title + ' の記録', '<p class="muted">' + v.length + ' 回・平均 ' + avg + '（未評価を除く）</p><div class="trend">' + v.map(function(x, i) { return '<div>' + (x.rating ? esc(x.rating) : '—') + '<i class="' + (x.rating >= 4 ? 'hi' : '') + '" style="height:' + (x.rating ? Math.round(x.rating * 10) : 3) + 'px"></i>' + (i + 1) + '回目<br>' + esc(dateKey(x.timestamp).slice(2, 10).replace(/-/g, '/')) + '</div>'; }).join('') + '</div><div class="card list">' + v.slice().reverse().map(function(x) { return '<div class="item tap" data-act="logOpen" data-id="' + esc(x.id) + '"><div class="grow"><div>' + esc(dateLabel(x.timestamp)) + ' ' + stars(x.rating) + '</div><div class="muted ell">' + esc(x.memo) + '</div></div></div>'; }).join('') + '</div>');
+  openSheet(l.title + ' の記録', '<p class="muted">' + v.length + ' 回・平均 ' + avg + '（未評価を除く）</p><div class="trend">' + v.map(function(x, i) { return '<div>' + (x.rating ? esc(x.rating) : '—') + '<i class="' + (x.rating >= 4 ? 'hi' : '') + '" style="height:' + (x.rating ? Math.round(x.rating * 10) : 3) + 'px"></i>' + (i + 1) + '回目<br>' + esc(dateKey(x.timestamp).slice(2, 10).replace(/-/g, '/')) + '</div>'; }).join('') + '</div><div class="card list">' + v.slice().reverse().map(function(x) { return '<div class="item tap" data-act="logOpen" data-id="' + esc(x.id) + '"><div class="grow"><div>' + esc(dateLabel(x.timestamp)) + '</div>' + ratingBlock(x.rating) + '<div class="muted ell">' + esc(x.memo) + '</div></div></div>'; }).join('') + '</div>');
 };
 
 // ---- タイムカプセル: 過去年の同じ頃 → 同じ季節の高評価 → 高評価 ----
@@ -1303,7 +1317,7 @@ function pairLikes(type, x) {
   var me = store.st.server.me;
   return [1, 2].map(function(n) {
     var on = isLiked(x['like' + n]);
-    return '<button type="button" class="like ' + (on ? 'on' : '') + '" data-act="like" data-type="' + type + '" data-id="' + esc(x.id) + '" data-n="' + n + '" aria-pressed="' + on + '"' + (me && me.n !== n ? ' disabled' : '') + '>' + icon('check') + esc(names()[n - 1]) + '</button>';
+    return '<button type="button" class="like ' + (on ? 'on' : '') + '" data-act="like" data-type="' + type + '" data-id="' + esc(x.id) + '" data-n="' + n + '" aria-pressed="' + on + '"' + (me && me.n !== n ? ' disabled' : '') + '>' + icon('heart') + esc(names()[n - 1]) + '</button>';
   }).join('');
 }
 // 自分の分の 1 項目だけを送る
@@ -1410,10 +1424,19 @@ var MV = { q: '', tag: '', seg: 'all', both: false, pin: false, shown: 40, open:
 
 // 2 つのシートの行を同じ形にそろえる
 function noteOf(type, x) {
-  return { type: type, id: x.id, key: type + ':' + x.id, x: x, title: x.title, body: type === 'memo' ? x.content : x.memo, url: x.url, tags: tagsOf(type, x), due: x.due || '', like1: x.like1, like2: x.like2, pinned: !!x.pinned, author: x.author, done: type === 'memo' ? x.state === '完了' : isVisited(x.status), date: dateKey(type === 'memo' ? x.editedAt || x.createdAt : x.regDate), _pending: x._pending };
+  var tags = tagsOf(type, x), l1 = isLiked(x.like1), l2 = isLiked(x.like2);
+  return { type: type, id: x.id, key: type + ':' + x.id, x: x, title: x.title, body: type === 'memo' ? x.content : x.memo, url: x.url, tags: tags, want: l1 || l2 || hasTag(tags, WANT_TAG), mutual: l1 && l2, due: x.due || '', like1: x.like1, like2: x.like2, pinned: !!x.pinned, author: x.author, done: type === 'memo' ? x.state === '完了' : isVisited(x.status), date: dateKey(type === 'memo' ? x.editedAt || x.createdAt : x.regDate), _pending: x._pending };
 }
 function notes() { return store.list('memo').map(function(x) { return noteOf('memo', x); }).concat(store.list('wish').map(function(x) { return noteOf('wish', x); })); }
 function noteByKey(key) { var p = String(key).split(':'), x = store.get(p[0], p[1]); return x && (p[0] === 'memo' || p[0] === 'wish') ? noteOf(p[0], x) : null; }
+// 気になるを押した・外したときに書く項目。ふたりとも外れたら「気になる」のタグも外す
+function wantPatch(n, me, on) {
+  var out = {}, other = isLiked(n.x['like' + (3 - me)]), tags = n.tags.filter(function(t) { return !sameTag(t, WANT_TAG); });
+  out['like' + me] = on ? 'true' : '';
+  if (on || other) tags.push(WANT_TAG);
+  out.tags = tagsValue(n.type, n.x, tags);
+  return out;
+}
 function setNoteDone(n, on) { store.patch(n.type, n.id, n.type === 'memo' ? { state: on ? '完了' : '' } : { status: on ? '訪問済' : '気になる' }); }
 
 // 期限（イベントの終了日など）。当日は終わっていない
@@ -1421,14 +1444,14 @@ function dueInfo(due, now) {
   var d = toDate(due);
   if (!d) return null;
   var t = now || new Date(), days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(t.getFullYear(), t.getMonth(), t.getDate())) / 864e5);
-  return { days: days, cls: days < 0 ? 'over' : days <= 7 ? 'soon' : '', label: days < 0 ? '終了（' + (d.getMonth() + 1) + '/' + d.getDate() + '）' : days === 0 ? '今日まで' : days === 1 ? '明日まで' : days <= 14 ? 'あと' + days + '日（' + (d.getMonth() + 1) + '/' + d.getDate() + '）' : (d.getFullYear() === t.getFullYear() ? '' : d.getFullYear() + '/') + (d.getMonth() + 1) + '/' + d.getDate() + 'まで' };
+  return { days: days, short: days < 0 ? '終了' : days === 0 ? '今日' : days <= 14 ? 'あと' + days + '日' : (d.getMonth() + 1) + '/' + d.getDate(), cls: days < 0 ? 'over' : days <= 7 ? 'soon' : '', label: days < 0 ? '終了（' + (d.getMonth() + 1) + '/' + d.getDate() + '）' : days === 0 ? '今日まで' : days === 1 ? '明日まで' : days <= 14 ? 'あと' + days + '日（' + (d.getMonth() + 1) + '/' + d.getDate() + '）' : (d.getFullYear() === t.getFullYear() ? '' : d.getFullYear() + '/') + (d.getMonth() + 1) + '/' + d.getDate() + 'まで' };
 }
 function filteredNotes() {
   var l = notes().filter(function(n) {
     if (MV.seg === 'done' ? !n.done : n.done) return false;
-    if (MV.seg === 'want' && !hasTag(n.tags, WANT_TAG)) return false;
+    if (MV.seg === 'want' && !n.want) return false;
     if (MV.seg === 'due' && !n.due) return false;
-    if (MV.both && !(isLiked(n.like1) && isLiked(n.like2))) return false;
+    if (MV.both && !n.mutual) return false;
     if (MV.pin && !n.pinned) return false;
     if (MV.tag && !hasTag(n.tags, MV.tag)) return false;
     return !MV.q || matches([n.title, n.body, n.url, n.author, n.tags.join(' ')].join(' '), MV.q);
@@ -1445,21 +1468,31 @@ RENDER.memo = function() {
   all.forEach(function(n) { n.tags.forEach(function(t) { cnt[t] = (cnt[t] || 0) + 1; }); });
   tags = Object.keys(cnt).filter(function(t) { return t !== WANT_TAG; }).sort(function(a, b) { return cnt[b] - cnt[a]; }).slice(0, 14);
   if (MV.tag && !hasTag(tags, MV.tag)) tags.unshift(MV.tag);
-  $('main').innerHTML = '<div class="row"><input type="search" class="grow" placeholder="メモを検索" value="' + esc(MV.q) + '" data-input="memoQ" aria-label="メモを検索"><button type="button" class="btn" data-act="noteAdd">追加</button></div>' +
+  $('main').innerHTML = '<div class="row"><input type="search" class="grow" placeholder="メモを検索" value="' + esc(MV.q) + '" data-input="memoQ" aria-label="メモを検索"></div>' +
     '<div class="seg" style="margin-top:8px">' + [['all', 'すべて'], ['want', WANT_TAG], ['due', '期限あり'], ['done', '済み']].map(function(t) { return '<button type="button" class="' + (MV.seg === t[0] ? 'on' : '') + '" data-act="noteSeg" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
-    '<div class="chips tagrow"><button type="button" class="chip ' + (MV.pin ? 'on' : '') + '" data-act="notePinF">ピン留め</button><button type="button" class="chip ' + (MV.both ? 'on' : '') + '" data-act="noteBoth">両方いいね</button>' + tags.map(function(t) { return '<button type="button" class="chip ' + (MV.tag && sameTag(MV.tag, t) ? 'on' : '') + '" data-act="tag" data-tag="#' + esc(t) + '">#' + esc(t) + '<small>' + (cnt[t] || 0) + '</small></button>'; }).join('') + '</div><div id="memoList"></div>';
+    '<div class="chips tagrow"><button type="button" class="chip ' + (MV.pin ? 'on' : '') + '" data-act="notePinF">ピン留め</button><button type="button" class="chip ' + (MV.both ? 'on' : '') + '" data-act="noteBoth">両想い<small>' + all.filter(function(n) { return n.mutual; }).length + '</small></button>' + tags.map(function(t) { return '<button type="button" class="chip ' + (MV.tag && sameTag(MV.tag, t) ? 'on' : '') + '" data-act="tag" data-tag="#' + esc(t) + '">#' + esc(t) + '<small>' + (cnt[t] || 0) + '</small></button>'; }).join('') + '</div><div id="memoList"></div>';
   RENDER.memoList();
 };
 RENDER.memoList = function() {
-  var l = filteredNotes();
-  $('memoList').innerHTML = l.slice(0, MV.shown).map(function(n) {
-    var k = esc(n.key), d = dueInfo(n.due), want = hasTag(n.tags, WANT_TAG);
-    return '<article class="card note' + (n.done ? ' is-done' : '') + '"><div class="row between"><div class="grow muted ell">' + esc(n.author) + (n.date ? '・' + esc(n.date.slice(0, 10)) : '') + (n._pending ? '・未送信' : '') + '</div>' + (d ? '<span class="pill due ' + d.cls + '">' + icon('clock') + esc(d.label) + '</span>' : '') + '<button type="button" class="pinbtn ' + (n.pinned ? 'on' : '') + '" data-act="notePin" data-key="' + k + '" aria-label="ピン留め" aria-pressed="' + n.pinned + '">' + icon('pin') + '</button></div>' +
-      '<h3 class="tap" data-act="noteEdit" data-key="' + k + '">' + esc(n.title || domainOf(n.url) || '無題') + '</h3>' + longText(n.body, [], 'note:' + n.key, 3) +
-      (safeUrl(n.url) ? '<a class="link ell blk" href="' + esc(safeUrl(n.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(domainOf(n.url)) + '</a>' : '') + (n.tags.length ? '<div class="taglist">' + tagButtons(n.tags) + '</div>' : '') +
-      '<div class="row acts">' + (want ? pairLikes(n.type, n.x) : '') + '<button type="button" class="btn small" data-act="noteLog" data-key="' + k + '">ログに書く</button><button type="button" class="btn small" data-act="noteDone" data-key="' + k + '">' + (n.done ? '戻す' : want ? '訪問した' : '済み') + '</button></div></article>';
-  }).join('') + (l.length > MV.shown ? '<button type="button" class="btn more" data-act="memoMore">もっと見る（残り ' + (l.length - MV.shown) + '）</button>' : '') || '<div class="empty">当てはまるメモがありません</div>';
-  checkLong($('memoList'));
+  var l = filteredNotes(), me = store.st.server.me;
+  var row = function(n) {
+    var k = esc(n.key), d = dueInfo(n.due), open = MV.open[n.key], mine = me && isLiked(n.x['like' + me.n]), other = me && isLiked(n.x['like' + (3 - me.n)]), tags = n.tags.filter(function(t) { return t !== WANT_TAG; });
+    return '<article class="nrow' + (n.done ? ' is-done' : '') + (open ? ' open' : '') + '"><div class="nhead"><button type="button" class="want ' + (n.mutual ? 'both' : mine ? 'mine' : other ? 'theirs' : '') + '" data-act="want" data-key="' + k + '" aria-pressed="' + !!mine + '" aria-label="気になる">' + icon('heart') + '</button>' +
+      '<div class="grow tap nline" data-act="noteOpen" data-key="' + k + '"><b class="ell">' + esc(n.title || domainOf(n.url) || String(n.body).slice(0, 30) || '無題') + '</b>' + (n.pinned ? icon('pin') : '') + '<span class="muted ell">' + esc([n.mutual ? '両想い' : other && !mine ? names()[2 - me.n] + 'が気になる' : '', tags.slice(0, 4).map(function(t) { return '#' + t; }).join(' '), domainOf(n.url)].filter(Boolean).join('　') || n.date.slice(5, 10).replace('-', '/')) + '</span></div>' +
+      (d ? '<span class="pill due ' + d.cls + '">' + esc(d.short) + '</span>' : '') + '</div>' +
+      (open ? '<div class="nbody">' + (n.body ? '<div class="text">' + richText(n.body, []) + '</div>' : '') + (safeUrl(n.url) ? '<a class="link ell blk" href="' + esc(safeUrl(n.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(n.url) + '</a>' : '') + (tags.length ? '<div class="taglist">' + tagButtons(tags) + '</div>' : '') + '<div class="muted">' + esc([d ? '期限 ' + d.label : '', n.author, n.date.slice(0, 10), n._pending ? '未送信' : ''].filter(Boolean).join('・')) + '</div>' +
+        '<div class="row acts"><button type="button" class="btn small" data-act="noteEdit" data-key="' + k + '">編集</button><button type="button" class="btn small" data-act="noteLog" data-key="' + k + '">ログに書く</button><button type="button" class="btn small" data-act="noteDone" data-key="' + k + '">' + (n.done ? '戻す' : n.want ? '訪問した' : '済み') + '</button><button type="button" class="btn small" data-act="notePin" data-key="' + k + '">' + (n.pinned ? 'ピンを外す' : 'ピン留め') + '</button></div></div>' : '') + '</article>';
+  };
+  $('memoList').innerHTML = (l.length ? '<div class="card nlist">' + l.slice(0, MV.shown).map(row).join('') + '</div>' : '<div class="empty">' + (MV.seg === 'want' ? 'ハートを押すと「気になる」になり、ここに並びます' : '当てはまるメモがありません') + '</div>') + (l.length > MV.shown ? '<button type="button" class="btn more" data-act="memoMore">もっと見る（残り ' + (l.length - MV.shown) + '）</button>' : '');
+};
+ACT.noteOpen = function(el) { var k = el.dataset.key; MV.open[k] = !MV.open[k]; RENDER.memoList(); };
+// 自分の「気になる」だけを付け外しする。相手の分には触れない
+ACT.want = function(el) {
+  var me = store.st.server.me, n = noteByKey(el.dataset.key);
+  if (!me) { toast('一度接続すると押せるようになります'); return; }
+  var on = !isLiked(n.x['like' + me.n]), other = isLiked(n.x['like' + (3 - me.n)]);
+  store.patch(n.type, n.id, wantPatch(n, me.n, on));
+  toast(on ? (other ? '両想いになりました' : '気になるに入れました') : '気になるを外しました');
 };
 ACT.noteSeg = function(el) { MV.seg = el.dataset.v; MV.shown = 40; RENDER.memo(); };
 ACT.notePinF = function() { MV.pin = !MV.pin; RENDER.memo(); };
@@ -1469,19 +1502,18 @@ ACT.noteDone = function(el) { var n = noteByKey(el.dataset.key), on = !n.done; s
 // 「済み」になるのは、ログを保存できたとき（途中でやめても状態が変わらない）
 ACT.noteLog = function(el) {
   var n = noteByKey(el.dataset.key), c = n.type === 'wish' && cats()[n.x.category] ? n.x.category : Object.keys(cats()).filter(function(k) { return hasTag(n.tags, k); })[0] || prefs().lastCat || 'グルメ';
-  openLogForm({ preset: { title: n.title || domainOf(n.url), category: c, subCategory: n.type === 'wish' ? n.x.subCategory || '' : '', memo: [n.body, n.url].filter(Boolean).join('\n'), tagList: n.tags.filter(function(t) { return t !== WANT_TAG && t !== c; }) }, noteKey: hasTag(n.tags, WANT_TAG) ? n.key : '' });
+  openLogForm({ preset: { title: n.title || domainOf(n.url), category: c, subCategory: n.type === 'wish' ? n.x.subCategory || '' : '', memo: [n.body, n.url].filter(Boolean).join('\n'), tagList: n.tags.filter(function(t) { return t !== WANT_TAG && t !== c; }) }, noteKey: n.want ? n.key : '' });
 };
-ACT.noteAdd = function() { noteForm(null); };
 ACT.noteEdit = function(el) { noteForm(noteByKey(el.dataset.key)); };
 
 // n: 編集するメモ / null なら追加（preset: title, body, url, tags, due）
 function noteForm(n, preset) {
-  var v = n ? { title: n.title, body: n.body, url: n.url, due: n.due, author: n.author } : Object.assign({ title: '', body: '', url: '', due: '', author: myName() }, preset || {}), x = n && n.x;
+  var v = n ? { title: n.title, body: n.body, url: n.url, due: n.due, author: n.author } : Object.assign({ title: '', body: '', url: '', due: '', author: myName() }, preset || {}), x = n && n.x, me = store.st.server.me, other = me ? names()[2 - me.n] : '', mine = n ? me && isLiked(n.x['like' + me.n]) : !!(preset && preset.want);
   openForm({
     title: n ? 'メモを編集' : '追加', values: v, saveLabel: n ? '保存' : '記録する',
     head: n ? '' : addSwitch('memo'),
     fields: [{ k: 'title', label: 'タイトル', ph: '気になるお店・イベント・覚えておきたいこと' }, { k: 'body', label: 'メモ', type: 'textarea' }, { k: 'url', label: 'URL', ph: 'https://' }, { k: 'due', label: '期限（イベントの終了日など）', type: 'date', half: true }, { k: 'author', label: '投稿者', type: 'select', options: names(), half: true }],
-    extra: '<div><span class="lbl">タグ</span>' + tagBox({ list: n ? n.tags.slice() : (preset && preset.tags || []).slice(), quick: [WANT_TAG], weight: function(type) { return type === 'log' ? 0.2 : 1; } }) + '</div><div class="row"><button type="button" class="btn small" data-act="notePaste">貼り付け</button><button type="button" class="btn small" data-act="fetchMeta">URL から題名を取得</button></div>',
+    extra: '<label class="wantsw"><input type="checkbox" name="want"' + (mine ? ' checked' : '') + (me ? '' : ' disabled') + '><span>' + icon('heart') + '気になる（' + esc(myName() || '自分') + '）</span><small>' + esc(other ? (n && isLiked(n.x['like' + (3 - me.n)]) ? other + 'も気になる' : other + 'はまだ') : '') + '</small></label><div><span class="lbl">タグ</span>' + tagBox({ list: n ? n.tags.filter(function(t) { return t !== WANT_TAG; }) : (preset && preset.tags || []).slice(), skip: [WANT_TAG], weight: function(type) { return type === 'log' ? 0.2 : 1; } }) + '</div><div class="row"><button type="button" class="btn small" data-act="notePaste">貼り付け</button><button type="button" class="btn small" data-act="fetchMeta">URL から題名を取得</button></div>',
     onDelete: n ? function() { trashItem(n.type, n.id, 'メモ'); } : null,
     onSave: function(val) {
       commitTagInput();
@@ -1489,9 +1521,13 @@ function noteForm(n, preset) {
       var type = n ? n.type : 'memo', out = { title: val.title, url: val.url, due: val.due, author: val.author };
       out[type === 'memo' ? 'content' : 'memo'] = val.body;
       if (!n) { out.createdAt = nowStamp(); out.category = safeUrl(val.url) ? 'Webクリップ' : ''; }
-      out.tags = tagsValue(type, Object.assign({}, x || {}, out), TP.list.concat(writtenTags(type, x, out)));
+      var want = val.want === 'on', tags = TP.list.concat(writtenTags(type, x, out)), keep = n && me && isLiked(n.x['like' + (3 - me.n)]);
+      // 名前が付いていない「気になる」（どちらも押していない昔の行）は、触らなければそのまま残す
+      if (want || keep || (n && n.want && !mine && !isLiked(n.x.like1) && !isLiked(n.x.like2))) tags.push(WANT_TAG);
+      out.tags = tagsValue(type, Object.assign({}, x || {}, out), tags);
+      if (me && (!n || want !== !!mine)) out['like' + me.n] = want ? 'true' : '';
       if (n) saveEdited(type, x, out);
-      else { var me = store.st.server.me; if (me && hasTag(TP.list, WANT_TAG)) out['like' + me.n] = 'true'; store.add('memo', out); }
+      else store.add('memo', out);
       toast('保存しました');
     }
   });
@@ -1686,7 +1722,7 @@ function openMap(layer, id) {
   closeMap();
   var el = document.createElement('div');
   el.id = 'mapView';
-  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">FUTARI MAP</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
+  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">Futari Map</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
     '<div class="map-btns">' + [['base', '地図'], ['show', '表示'], ['find', '検索'], ['here', '現在地'], ['fit', '全体'], ['close', '閉じる']].map(function(b) { return '<button type="button" data-act="mapBtn" data-v="' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div><div class="map-card" id="mapCard"></div>';
   document.body.appendChild(el);
   document.body.classList.add('locked');
@@ -1766,7 +1802,7 @@ function drawMapCard() {
   box.classList.toggle('on', !!s);
   if (!s) return;
   var x = s.kind === 'log' ? store.get('log', s.id) : null, p = x ? photosOf(x) : [], same = (MP.group || []).filter(function(g) { return g.key !== s.key; });
-  box.innerHTML = '<div class="row">' + (p.length ? '<div class="thumb">' + photoTag(p[0], 'thumb') + '</div>' : '<div class="pin ' + s.color + '">' + esc(s.mark) + '</div>') + '<div class="grow"><b class="ell blk">' + esc(s.name) + '</b><div>' + (s.rating ? stars(s.rating) : '') + '</div><div class="muted ell">' + esc(s.sub) + '</div></div></div>' +
+  box.innerHTML = '<div class="row">' + (p.length ? '<div class="thumb">' + photoTag(p[0], 'thumb') + '</div>' : '<div class="pin ' + s.color + '">' + esc(s.mark) + '</div>') + '<div class="grow"><b class="ell blk">' + esc(s.name) + '</b>' + (s.rating ? ratingBlock(s.rating) : '') + '<div class="muted ell">' + esc(s.sub) + '</div></div></div>' +
     '<div class="row acts">' + (s.kind === 'log' ? '<button type="button" class="btn small primary" data-act="logOpen" data-id="' + esc(s.id) + '">記録を見る</button>' : s.kind === 'road' ? '<button type="button" class="btn small primary" data-act="roadOpen" data-id="' + esc(s.id) + '">くわしく</button>' : '<button type="button" class="btn small primary" data-act="stamp" data-id="' + esc(s.id) + '">スタンプ</button>') + '<a class="btn small" target="_blank" rel="noopener noreferrer" href="' + esc(mapUrl(s.kind === 'log' && x.address ? x.title + ' ' + x.address : s.at.join(','))) + '">Google マップ</a></div>' +
     (same.length ? '<div class="chips">' + same.slice(0, 12).map(function(g) { return '<button type="button" class="chip" data-act="mapPick" data-key="' + esc(g.key) + '">' + esc(g.name) + '</button>'; }).join('') + '</div>' : '');
   watchPhotos(box);
