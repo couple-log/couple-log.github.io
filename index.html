@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>ふたりログ</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com https://drive.google.com https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; connect-src 'self' https://script.google.com https://script.googleusercontent.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="theme-color" content="#0a101d">
+<meta name="theme-color" content="#0d0e10">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
@@ -15,7 +15,7 @@
 </head>
 <body>
 <header id="top">
-  <h1>ふたりログ</h1>
+  <h1>FUTARI LOG</h1>
   <button type="button" id="syncBadge" class="badge" data-act="sync" hidden></button>
   <button type="button" class="icon-btn" data-act="openMap" aria-label="地図" data-icon="map"></button>
   <button type="button" class="icon-btn" data-act="favs" aria-label="お気に入り" data-icon="plan"></button>
@@ -25,10 +25,10 @@
 <main id="main"></main>
 <nav aria-label="画面の切り替え">
   <button type="button" data-act="go" data-tab="log" data-icon="log">ログ</button>
-  <button type="button" data-act="go" data-tab="plan" data-icon="flag">プラン</button>
-  <button type="button" class="fab" data-act="quick" aria-label="記録を追加" data-icon="plus"></button>
   <button type="button" data-act="go" data-tab="memo" data-icon="memo">メモ</button>
-  <button type="button" data-act="go" data-tab="out" data-icon="out">おでかけ</button>
+  <button type="button" data-act="go" data-tab="plan" data-icon="flag">プラン</button>
+  <button type="button" data-act="go" data-tab="out" data-icon="out" data-feature="out" hidden>おでかけ</button>
+  <button type="button" class="fab" data-act="quick" data-icon="plus">記録</button>
 </nav>
 <div id="toast" role="status" aria-live="polite"></div>
 <noscript>JavaScript を有効にしてください。</noscript>

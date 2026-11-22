@@ -63,8 +63,8 @@ function richText(text, photos) {
 }
 
 function stars(r) {
-  var n = Math.round(Number(r) || 0);
-  return n > 0 ? '<span class="stars" aria-label="評価 ' + n + '">' + '★'.repeat(Math.min(5, n)) + '<i>' + '★'.repeat(Math.max(0, 5 - n)) + '</i></span>' : '<span class="muted">未評価</span>';
+  var n = Number(r) || 0;
+  return n > 0 ? '<span class="stars" aria-label="評価 ' + n + '">' + n.toFixed(1) + '<i style="--p:' + Math.min(100, n * 20) + '%"></i></span>' : '<span class="muted">—</span>';
 }
 
 // 5 項目の軽いレーダー図（0 は未評価）
@@ -81,12 +81,12 @@ function radar(labels, values, size) {
 
 // Exif から撮影位置だけを読む（JPEG のみ。写真そのものからは縮小時に落ちる）
 function readGps(file) {
-  return file.slice(0, 262144).arrayBuffer().then(function(buf) {
+  return file.slice(0, 1048576).arrayBuffer().then(function(buf) {
     var v = new DataView(buf), o = 2;
     if (v.byteLength < 12 || v.getUint16(0) !== 0xFFD8) return null;
     while (o + 10 < v.byteLength) {
       var marker = v.getUint16(o), len = v.getUint16(o + 2);
-      if (marker === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) return gpsFromTiff(v, o + 10);
+      if (marker === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) { var g = gpsFromTiff(v, o + 10); if (g) return g; }
       if ((marker & 0xFF00) !== 0xFF00 || len < 2) return null;
       o += 2 + len;
     }
@@ -533,6 +533,10 @@ function fetchPhotos() {
   });
 }
 
+// 機能の入り切り。false にすると入口だけを隠す（コード・シートのデータは残る）
+// out: おでかけ（スタンプ帳・百名道・記念カード）。戻すときは true にして反映する
+var FEATURES = { out: false };
+
 // カテゴリの定義（旧アプリと同じ値。シートに入っている文字列と一致させる）
 var CATS = {
   '日記・日常': { sub: ['日常メモ', '家事・暮らし', 'お出かけ', '購入品', '記念日・イベント', '健康・美容', '仕事・学び', 'その他'], scores: [], prices: [] },
@@ -665,12 +669,33 @@ function options(list, cur) {
   return l.map(function(o) { var v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o; return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
 }
 
+// ---- キーボード ----
+// 押した瞬間に入力欄の選択が外れると、キーボードが閉じて画面が動き、ボタンを押し損ねる。選択を保ったまま押せるようにする
+document.addEventListener('mousedown', function(e) {
+  var b = e.target.closest('.sheet button');
+  if (b && /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) e.preventDefault();
+});
+// Ctrl（Command）+ Enter でも記録できる
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing) return;
+  var f = e.target.closest && e.target.closest('form');
+  if (f) { e.preventDefault(); f.requestSubmit(); }
+});
+// キーボードで隠れていない範囲に小窓を収める
+function fitViewport() {
+  var v = window.visualViewport, r = document.documentElement.style;
+  if (!v) return;
+  r.setProperty('--vvh', Math.round(v.height) + 'px');
+  r.setProperty('--vvt', Math.round(v.offsetTop) + 'px');
+}
+if (window.visualViewport) { visualViewport.addEventListener('resize', fitViewport); visualViewport.addEventListener('scroll', fitViewport); fitViewport(); }
+
 // ---- 下から出る小窓 ----
 function openSheet(title, body, opt) {
   opt = opt || {};
   var el = document.createElement('div');
   el.className = 'sheet-bg';
-  el.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><header><h2>' + esc(title) + '</h2><button type="button" class="icon-btn" data-act="closeSheet" aria-label="閉じる">' + icon('close') + '</button></header><div class="sheet-body">' + body + '</div></div>';
+  el.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><header><h2>' + esc(title) + '</h2>' + (opt.form ? '<button type="submit" class="headsave" form="' + opt.form + '">' + esc(opt.save || '保存') + '</button>' : '') + '<button type="button" class="icon-btn" data-act="closeSheet" aria-label="閉じる">' + icon('close') + '</button></header><div class="sheet-body">' + body + '</div></div>';
   el.addEventListener('mousedown', function(e) { if (e.target === el) closeSheet(); });
   el._onClose = opt.onClose;
   document.body.appendChild(el);
@@ -704,16 +729,17 @@ ACT.undo = function() { if (APP.undo) APP.undo(); APP.undo = null; $('toast').cl
 
 // ---- 入力フォームの共通部品 ----
 // fields: [{k, label, type: text|textarea|select|date|url|month, options, ph, required}]
+var formSeq = 0;
 function openForm(cfg) {
   var v = cfg.values || {};
-  var html = '<form data-submit="form" class="form">' + (cfg.head || '') + cfg.fields.map(function(f) {
+  var fid = 'form' + (++formSeq), html = '<form data-submit="form" class="form" id="' + fid + '">' + (cfg.head || '') + cfg.fields.map(function(f) {
     var val = v[f.k] === undefined || v[f.k] === null ? '' : String(v[f.k]), at = ' name="' + f.k + '"' + (f.required ? ' required' : '');
     var input = f.type === 'textarea' ? '<textarea rows="4"' + at + ' placeholder="' + esc(f.ph || '') + '">' + esc(val) + '</textarea>'
       : f.type === 'select' ? '<select' + at + (f.change ? ' data-change="' + f.change + '"' : '') + '>' + options(f.options, val) + '</select>'
       : '<input type="' + (f.type || 'text') + '"' + at + ' value="' + esc(val) + '" placeholder="' + esc(f.ph || '') + '">';
     return '<label class="' + (f.half ? 'half' : '') + '"><span>' + esc(f.label) + '</span>' + input + '</label>';
   }).join('') + (cfg.extra || '') + '<div class="form-foot stick">' + (cfg.onDelete ? '<button type="button" class="btn danger" data-act="formDelete">ゴミ箱へ</button>' : '') + '<button class="btn primary" type="submit">' + esc(cfg.saveLabel || '保存') + '</button></div></form>';
-  var el = openSheet(cfg.title, html);
+  var el = openSheet(cfg.title, html, { form: fid, save: cfg.saveLabel === '記録する' ? '記録' : '保存' });
   el._form = cfg;
   return el;
 }
@@ -815,6 +841,8 @@ var store = createStore({
 function names() { return store.st.server.names; }
 function myName() { return store.st.server.me ? store.st.server.me.name : ''; }
 
+// 使わない機能の入口を隠す（処理とデータは残す）
+function applyFeatures() { document.querySelectorAll('[data-feature]').forEach(function(el) { el.hidden = !FEATURES[el.dataset.feature]; }); document.body.dataset.out = FEATURES.out ? '1' : '0'; }
 // 端末の控えだけで画面を出す。通信はその後
 function boot() {
   // iPhone は 16px 未満の入力欄で画面が勝手に拡大されるため、拡大の上限だけを付ける（指での拡大は使える）
@@ -824,7 +852,8 @@ function boot() {
     toast('端末内の保存領域を開けません。プライベートブラウズを解除してください');
   }).then(function() {
     APP.ready = true;
-    go(RENDER[prefs().start] ? prefs().start : 'log');
+    applyFeatures();
+    go(RENDER[prefs().start] && FEATURES[prefs().start] !== false ? prefs().start : 'log');
     renderBadge();
     document.body.classList.add('ready');
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function() {});
@@ -955,7 +984,7 @@ RENDER.log = function() {
     '<div class="filters"' + (LV.open ? '' : ' hidden') + '>' +
       '<select data-change="logF" data-k="cat" aria-label="大分類">' + options([['', '大分類']].concat(Object.keys(cats())), LV.cat) + '</select>' +
       '<select data-change="logF" data-k="sub" aria-label="中分類">' + options([['', '中分類']].concat(catOf(LV.cat).sub), LV.sub) + '</select>' +
-      '<select data-change="logF" data-k="rating" aria-label="評価">' + options([['', '評価'], ['5', '★5'], ['4', '★4'], ['3', '★3'], ['2', '★2'], ['1', '★1']], LV.rating) + '</select>' +
+      '<select data-change="logF" data-k="rating" aria-label="評価">' + options([['', '評価'], ['5', '5.0'], ['4', '4.0'], ['3', '3.0'], ['2', '2.0'], ['1', '1.0']], LV.rating) + '</select>' +
       '<select data-change="logF" data-k="author" aria-label="投稿者">' + options([['', '投稿者']].concat(names()), LV.author) + '</select>' +
       '<select data-change="logF" data-k="sort" aria-label="並べ替え">' + options([['new', '新しい順'], ['old', '古い順'], ['rate', '評価の高い順']], LV.sort) + '</select>' +
       '<button type="button" class="btn small" data-act="logClear">条件を消す</button></div>' +
@@ -970,10 +999,10 @@ RENDER.logList = function() {
   var page = l.slice(0, LV.shown), html = '';
   if (LV.view === 'photo') html = '<div class="pgrid">' + page.map(function(x) {
     var p = photosOf(x);
-    return '<button type="button" class="pcell" data-act="logOpen" data-id="' + esc(x.id) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="nophoto">' + esc(String(x.memo || '').slice(0, 40)) + '</span>') + (p.length > 1 ? '<span class="cnt">' + p.length + '</span>' : '') + '<span class="cap">' + esc(x.title || '無題') + (x.rating ? '<br>★' + esc(x.rating) : '') + '</span></button>';
+    return '<button type="button" class="pcell" data-act="logOpen" data-id="' + esc(x.id) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="nophoto">' + esc(String(x.memo || '').slice(0, 40)) + '</span>') + (p.length > 1 ? '<span class="cnt">' + p.length + '</span>' : '') + '<span class="cap">' + esc(x.title || '無題') + (x.rating ? '<em>' + esc(Number(x.rating).toFixed(1)) + '</em>' : '') + '</span></button>';
   }).join('') + '</div>';
   else if (LV.view === 'table') html = '<div class="tbl"><table><thead><tr><th>日付</th><th>タイトル</th><th>評価</th><th>分類</th><th>中分類</th><th>価格</th><th>投稿者</th></tr></thead><tbody>' + page.map(function(x) {
-    return '<tr data-act="logOpen" data-id="' + esc(x.id) + '" tabindex="0"><td>' + esc(dateKey(x.timestamp).slice(0, 10)) + '</td><td>' + esc(x.title) + '</td><td>' + (x.rating ? '★' + esc(x.rating) : '-') + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.subCategory || '-') + '</td><td>' + esc(x.price || '-') + '</td><td>' + esc(x.author) + '</td></tr>';
+    return '<tr data-act="logOpen" data-id="' + esc(x.id) + '" tabindex="0"><td>' + esc(dateKey(x.timestamp).slice(0, 10)) + '</td><td>' + esc(x.title) + '</td><td>' + (x.rating ? esc(Number(x.rating).toFixed(1)) : '—') + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.subCategory || '-') + '</td><td>' + esc(x.price || '-') + '</td><td>' + esc(x.author) + '</td></tr>';
   }).join('') + '</tbody></table></div>';
   else html = page.map(function(x) { return LV.view === 'blog' ? blogCard(x, ix) : dataCard(x, ix); }).join('');
   box.innerHTML = html + (l.length > LV.shown ? '<button type="button" class="btn more" data-act="logMore">もっと見る（残り ' + (l.length - LV.shown) + '）</button>' : '');
@@ -1044,7 +1073,7 @@ ACT.logEdit = function(el) { var id = el.closest('[data-id]').dataset.id; closeS
 ACT.visits = function(el) {
   var l = store.get('log', el.dataset.id), k = normKey(l.title), v = sortedLogs().filter(function(x) { return normKey(x.title) === k; }).reverse();
   var rated = v.filter(function(x) { return x.rating > 0; }), avg = rated.length ? (rated.reduce(function(s, x) { return s + x.rating; }, 0) / rated.length).toFixed(1) : '-';
-  openSheet(l.title + ' の記録', '<p class="muted">' + v.length + ' 回・平均 ★' + avg + '（未評価を除く）</p><div class="trend">' + v.map(function(x, i) { return '<div>' + (x.rating ? '★' + esc(x.rating) : '-') + '<i class="' + (x.rating >= 4 ? 'hi' : '') + '" style="height:' + (x.rating ? Math.round(x.rating * 10) : 3) + 'px"></i>' + (i + 1) + '回目<br>' + esc(dateKey(x.timestamp).slice(2, 10).replace(/-/g, '/')) + '</div>'; }).join('') + '</div><div class="card list">' + v.slice().reverse().map(function(x) { return '<div class="item tap" data-act="logOpen" data-id="' + esc(x.id) + '"><div class="grow"><div>' + esc(dateLabel(x.timestamp)) + ' ' + stars(x.rating) + '</div><div class="muted ell">' + esc(x.memo) + '</div></div></div>'; }).join('') + '</div>');
+  openSheet(l.title + ' の記録', '<p class="muted">' + v.length + ' 回・平均 ' + avg + '（未評価を除く）</p><div class="trend">' + v.map(function(x, i) { return '<div>' + (x.rating ? esc(x.rating) : '—') + '<i class="' + (x.rating >= 4 ? 'hi' : '') + '" style="height:' + (x.rating ? Math.round(x.rating * 10) : 3) + 'px"></i>' + (i + 1) + '回目<br>' + esc(dateKey(x.timestamp).slice(2, 10).replace(/-/g, '/')) + '</div>'; }).join('') + '</div><div class="card list">' + v.slice().reverse().map(function(x) { return '<div class="item tap" data-act="logOpen" data-id="' + esc(x.id) + '"><div class="grow"><div>' + esc(dateLabel(x.timestamp)) + ' ' + stars(x.rating) + '</div><div class="muted ell">' + esc(x.memo) + '</div></div></div>'; }).join('') + '</div>');
 };
 
 // ---- タイムカプセル: 過去年の同じ頃 → 同じ季節の高評価 → 高評価 ----
@@ -1094,7 +1123,7 @@ function openLogForm(opt) {
     delete LF.v.tagList;
     if (d) toast('書きかけの続きです');
   }
-  openSheet(LF.isNew ? '追加' : '記録を編集', '<form data-submit="log" class="form" id="logForm"></form>', { onClose: function() { saveDraft(); LF = null; } });
+  openSheet(LF.isNew ? '追加' : '記録を編集', '<form data-submit="log" class="form" id="logForm"></form>', { form: 'logForm', save: LF.isNew ? '記録' : '保存', onClose: function() { saveDraft(); LF = null; } });
   drawLogForm();
 }
 
@@ -1120,9 +1149,9 @@ ACT.addSwitch = function(el) {
 function drawLogForm() {
   var v = LF.v, c = catOf(v.category), ph = formPhotos(), sec = function(t, body, note) { return '<section class="fs"><h3>' + t + (note ? '<small>' + note + '</small>' : '') + '</h3>' + body + '</section>'; };
   $('logForm').innerHTML = (LF.isNew ? addSwitch('log') : '') +
-    sec('タイトル', '<input name="title" value="' + esc(v.title) + '" data-input="lf" required autocomplete="off" placeholder="店名・場所・作品名・出来事" aria-label="タイトル">') +
+    sec('タイトル', '<input name="title" value="' + esc(v.title) + '" data-input="lf" data-change="lfTitle" required autocomplete="off" placeholder="店名・場所・作品名・出来事" aria-label="タイトル">') +
     sec('分類', '<div class="chips wrap">' + Object.keys(cats()).concat(v.category && !cats()[v.category] ? [v.category] : []).map(function(k) { return '<button type="button" class="chip ' + (k === v.category ? 'on' : '') + '" data-act="lfCat" data-v="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div><div class="two"><select name="subCategory" data-change="lf" aria-label="中分類">' + options([['', '中分類']].concat(c.sub), v.subCategory) + '</select>' + (c.prices.length ? '<select name="price" data-change="lf" aria-label="価格帯・時間">' + options([['', v.category === 'レシピ' ? '所要時間' : '価格帯']].concat(c.prices), v.price) + '</select>' : '') + '</div>') +
-    sec('総合評価', '<div class="guide">' + RATE_GUIDE.map(function(g) { var on = (v.rating || 0) === g[0]; return '<button type="button" class="' + (on ? 'on' : '') + '" data-act="lfRate" data-v="' + g[0] + '" aria-pressed="' + on + '"><span class="st">' + '★'.repeat(g[0]) + '</span><span class="grow"><b>' + g[1] + '</b><span class="muted blk">' + g[2] + '</span></span></button>'; }).join('') + '</div>', 'もう一度押すと未評価') +
+    sec('総合評価', '<div class="guide">' + RATE_GUIDE.map(function(g) { var on = (v.rating || 0) === g[0]; return '<button type="button" class="' + (on ? 'on' : '') + '" data-act="lfRate" data-v="' + g[0] + '" aria-pressed="' + on + '"><span class="st">' + g[0] + '.0</span><span class="grow"><b>' + g[1] + '</b><span class="muted blk">' + g[2] + '</span></span></button>'; }).join('') + '</div>', 'もう一度押すと未評価') +
     (c.scores.length ? sec('項目別の評価', '<div class="scores">' + c.scores.map(function(t, i) { return '<div><span>' + esc(t) + '</span>' + scoreDots('s' + (i + 1)) + '</div>'; }).join('') + '</div>', '任意') : '') +
     sec('写真', '<div class="fphotos">' + ph.map(function(f, i) { return '<div>' + photoTag(f.p, 'thumb') + '<button type="button" class="n" data-act="lfMark" data-n="' + (i + 1) + '" aria-label="本文に写真' + (i + 1) + 'を入れる">写真' + (i + 1) + '</button><button type="button" class="x" data-act="lfDel" data-kind="' + f.kind + '" data-key="' + esc(f.key) + '" aria-label="写真を外す">' + icon('close') + '</button></div>'; }).join('') + '<label>' + icon('camera') + '<input type="file" accept="image/*" multiple data-change="lfFile" aria-label="写真を選ぶ"></label></div><div id="lfGps">' + gpsHint() + '</div>', '位置情報は取り除いて保存') +
     sec('感想・メモ', '<textarea name="memo" rows="5" data-input="lf" aria-label="感想・メモ">' + esc(v.memo) + '</textarea>' + (v.category === 'レシピ' ? '<button type="button" class="btn small" data-act="lfRecipe">レシピのひな形</button>' : '')) +
@@ -1132,18 +1161,66 @@ function drawLogForm() {
   drawTags();
   watchPhotos($('logForm'));
 }
+// 場所の状態: 入っていれば場所と出どころ、写真に位置がなければ代わりの手段を出す
+var PLACE_SRC = { photo: '写真の位置情報から', title: 'タイトルから推定', here: '現在地から', search: '検索から' };
 function gpsHint() {
-  return LF.gps ? '<button type="button" class="chip" data-act="lfGps" style="margin-top:6px">写真の撮影場所を使う' + (LF.gps.address ? '：' + esc(LF.gps.address) : '') + '</button>' : LF.v.lat ? '<span class="muted">位置あり</span>' : '';
+  var v = LF.v, g = LF.place || {};
+  if (g.loading) return '<div class="place muted">場所を調べています</div>';
+  if (v.address || v.lat) return '<div class="place">' + icon('out') + '<span class="grow ell">' + esc(v.address || v.lat + ', ' + v.lng) + '</span>' + (g.src ? '<span class="muted">' + PLACE_SRC[g.src] + '</span>' : '') + '<button type="button" class="btn small" data-act="lfPlaceClear">消す</button></div>';
+  if (!formPhotos().length) return '';
+  return '<div class="place wrap"><span class="muted grow">' + (g.none ? '写真に位置情報がありません' : '場所は未入力です') + '</span>' + '<button type="button" class="btn small" data-act="lfGeo">タイトルから</button><button type="button" class="btn small" data-act="lfHere">現在地</button><label class="btn small">元の写真から読む<input type="file" data-change="lfGpsFile" hidden></label></div>';
 }
+function drawPlace() { var el = $('lfGps'); if (el) el.innerHTML = gpsHint(); var sum = $('lfSum'); if (sum) sum.textContent = lfSummary(); var a = $('logForm') && $('logForm').elements.address; if (a && document.activeElement !== a) a.value = LF.v.address || ''; }
+// 自分で書いた・消した場所は、自動では書き換えない
+function canAutoPlace(me) { return LF === me && !me.manual && !me.v.address && !me.v.lat; }
+function setPlace(me, p, src) {
+  if (LF !== me) return;
+  me.v.lat = p.lat; me.v.lng = p.lng; me.place = { src: src };
+  if (p.address) me.v.address = p.address;
+  saveDraft(); drawPlace();
+  if (!p.address && canCall()) {
+    me.place.loading = true; drawPlace();
+    callApi('reverseGeocode', { lat: p.lat, lng: p.lng }).then(function(g) { if (g.found && me.v.lat === p.lat && !me.manual) me.v.address = g.address; }).catch(function() {}).then(function() { if (LF !== me || !me.place) return; me.place.loading = false; saveDraft(); drawPlace(); });
+  }
+}
+// 写真に位置がないときは、タイトルで調べて入れる（日記とレシピは除く。推定だと分かるように出し、消せる）
+function placeFromTitle(me, manual) {
+  var q = String(me.v.address || me.v.title || '').trim();
+  if (!manual && (!canAutoPlace(me) || q.length < 2 || /日記|レシピ/.test(me.v.category) || me.triedTitle === q)) return Promise.resolve();
+  if (!canCall()) { if (manual) toast('今は通信できません'); return Promise.resolve(); }
+  me.triedTitle = q;
+  me.place = { loading: true }; drawPlace();
+  return callApi('geocode', { query: q }).then(function(g) {
+    if (LF !== me) return;
+    me.place = { none: true };
+    if (g.found && (manual || canAutoPlace(me))) { if (manual) me.manual = false; setPlace(me, g, manual ? 'search' : 'title'); }
+    else if (!g.found && manual) toast('場所が見つかりません');
+  }).catch(function(e) { if (LF !== me) return; me.place = { none: true }; if (manual) toast(e.message); }).then(function() { if (LF === me) drawPlace(); });
+}
+ACT.lfPlaceClear = function() { LF.v.address = ''; LF.v.lat = LF.v.lng = null; LF.place = null; LF.manual = true; saveDraft(); drawPlace(); };
+ACT.lfHere = function() {
+  var me = LF;
+  if (!navigator.geolocation) { toast('この端末では現在地を使えません'); return; }
+  me.place = { loading: true }; drawPlace();
+  navigator.geolocation.getCurrentPosition(function(p) { me.manual = false; setPlace(me, { lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6) }, 'here'); }, function() { if (LF !== me) return; me.place = { none: true }; drawPlace(); toast('現在地を取得できません'); }, { enableHighAccuracy: true, timeout: 10000 });
+};
+// 位置情報を読むためだけに元のファイルを選ぶ（写真は追加しない）。Android は写真の選択画面が位置情報を落とすため
+INPUT.lfGpsFile = function(el) {
+  var me = LF, f = (el.files || [])[0];
+  el.value = '';
+  if (f) readGps(f).then(function(g) { if (LF !== me) return; if (g) { me.manual = false; setPlace(me, g, 'photo'); } else toast('このファイルにも位置情報がありません'); });
+};
 
 INPUT.lf = function(el) {
   var k = el.name, val = el.value;
   if (k === 'timestamp') LF.v[k] = normDate(val).slice(0, 16);
   else LF.v[k] = val;
   var sum = $('lfSum'); if (sum) sum.textContent = lfSummary();
-  if (k === 'address') { LF.v.lat = LF.v.lng = null; $('lfGps').innerHTML = gpsHint(); } // 住所を書き換えたら、古い位置は使わない
+  if (k === 'address') { LF.v.lat = LF.v.lng = null; LF.manual = true; LF.place = null; drawPlace(); } // 住所を書き換えたら、古い位置は使わない
   saveDraft();
 };
+// 写真のあとにタイトルを書いた場合
+INPUT.lfTitle = function() { if (LF && formPhotos().length && LF.place && LF.place.none) placeFromTitle(LF); };
 ACT.lfCat = function(el) { LF.v.category = el.dataset.v; if (catOf(el.dataset.v).sub.indexOf(LF.v.subCategory) < 0) LF.v.subCategory = ''; if (catOf(el.dataset.v).prices.indexOf(LF.v.price) < 0) LF.v.price = ''; saveDraft(); drawLogForm(); };
 ACT.lfRate = function(el) { var n = Number(el.dataset.v); LF.v.rating = LF.v.rating === n ? 0 : n; document.querySelectorAll('#logForm .guide button').forEach(function(b) { var on = Number(b.dataset.v) === LF.v.rating; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); saveDraft(); };
 ACT.lfScore = function(el) { var k = el.dataset.k, n = Number(el.dataset.v); LF.v[k] = LF.v[k] === n ? null : n; el.parentNode.outerHTML = scoreDots(k); saveDraft(); };
@@ -1171,22 +1248,13 @@ INPUT.lfFile = function(el) {
     return p.then(function() { return preparePhoto(f); }).then(function(r) {
       if (LF !== me) { photoDel(r.id); return; }
       me.drafts.push(r.id);
-      if (r.gps && !me.gps) { me.gps = r.gps; if (canCall()) callApi('reverseGeocode', r.gps).then(function(g) { if (g.found && LF === me) { me.gps.address = g.address; $('lfGps').innerHTML = gpsHint(); } }).catch(function() {}); }
+      if (r.gps && canAutoPlace(me)) setPlace(me, r.gps, 'photo');
       saveDraft(); drawLogForm();
     }).catch(function() { bad++; });
-  }, Promise.resolve()).then(function() { if (bad) toast(bad + ' 枚の写真を読み込めませんでした'); });
+  }, Promise.resolve()).then(function() { if (bad) toast(bad + ' 枚の写真を読み込めませんでした'); if (canAutoPlace(me) && files.length > bad) { me.place = { none: true }; drawPlace(); return placeFromTitle(me); } });
 };
-ACT.lfGps = function() { LF.v.lat = LF.gps.lat; LF.v.lng = LF.gps.lng; if (LF.gps.address) LF.v.address = LF.gps.address; LF.gps = null; saveDraft(); drawLogForm(); };
-ACT.lfGeo = function(el) {
-  var q = LF.v.address || LF.v.title, me = LF;
-  if (!q) { toast('場所かタイトルを入力してください'); return; }
-  el.disabled = true;
-  callApi('geocode', { query: q }).then(function(g) {
-    if (LF !== me) return;
-    if (!g.found) { toast('場所が見つかりません'); return; }
-    LF.v.address = g.address; LF.v.lat = g.lat; LF.v.lng = g.lng; saveDraft(); drawLogForm(); toast('場所を入れました');
-  }).catch(function(e) { toast(e.message); }).then(function() { el.disabled = false; });
-};
+
+ACT.lfGeo = function() { if (!(LF.v.address || LF.v.title)) { toast('タイトルを入力してください'); return; } placeFromTitle(LF, true); };
 ACT.lfDiscard = function() {
   var ids = LF.drafts.slice();
   LF.isNew = false; // 閉じるときに書き戻さない
@@ -1235,7 +1303,7 @@ function pairLikes(type, x) {
   var me = store.st.server.me;
   return [1, 2].map(function(n) {
     var on = isLiked(x['like' + n]);
-    return '<button type="button" class="like ' + (on ? 'on' : '') + '" data-act="like" data-type="' + type + '" data-id="' + esc(x.id) + '" data-n="' + n + '" aria-pressed="' + on + '"' + (me && me.n !== n ? ' disabled' : '') + '>' + icon('heart') + esc(names()[n - 1]) + '</button>';
+    return '<button type="button" class="like ' + (on ? 'on' : '') + '" data-act="like" data-type="' + type + '" data-id="' + esc(x.id) + '" data-n="' + n + '" aria-pressed="' + on + '"' + (me && me.n !== n ? ' disabled' : '') + '>' + icon('check') + esc(names()[n - 1]) + '</button>';
   }).join('');
 }
 // 自分の分の 1 項目だけを送る
@@ -1575,12 +1643,12 @@ ACT.cardEdit = function(el) {
 function outFav() { $('outBox').innerHTML = favHtml(); }
 function favHtml() {
   var c = store.col('favorite'), keys = Object.keys(c).sort(function(a, b) { return String(c[a].value.title).localeCompare(String(c[b].value.title), 'ja'); });
-  return '<div class="section"><h3>お気に入りサイト</h3><button type="button" class="btn small" data-act="favEdit">追加</button></div>' + (keys.length ? '<div class="favs">' + keys.map(function(k) { var f = c[k].value; return '<div class="fav"><a href="' + esc(safeUrl(f.url)) + '" target="_blank" rel="noopener noreferrer"><span class="fi">' + esc(f.icon || (f.title || domainOf(f.url)).slice(0, 1)) + '</span><span class="grow"><b class="ell blk">' + esc(f.title || domainOf(f.url)) + '</b><span class="muted ell blk">' + esc(f.note || domainOf(f.url)) + '</span></span></a><button type="button" class="icon-btn" data-act="favEdit" data-key="' + esc(k) + '" aria-label="編集">' + icon('edit') + '</button></div>'; }).join('') + '</div>' : '<div class="empty">まだありません</div>');
+  return '<div class="section"><h3>お気に入りサイト</h3><button type="button" class="btn small" data-act="favEdit">追加</button></div>' + (keys.length ? '<div class="favs">' + keys.map(function(k) { var f = c[k].value; return '<div class="fav"><a href="' + esc(safeUrl(f.url)) + '" target="_blank" rel="noopener noreferrer"><span class="fi">' + esc((f.title || domainOf(f.url)).slice(0, 1)) + '</span><span class="grow"><b class="ell blk">' + esc(f.title || domainOf(f.url)) + '</b><span class="muted ell blk">' + esc(f.note || domainOf(f.url)) + '</span></span></a><button type="button" class="icon-btn" data-act="favEdit" data-key="' + esc(k) + '" aria-label="編集">' + icon('edit') + '</button></div>'; }).join('') + '</div>' : '<div class="empty">まだありません</div>');
 }
 // どの画面からも開けるように、上部の星から出す
 ACT.favs = function() { openSheet('お気に入り', '<div id="favBox">' + favHtml() + '</div>'); };
 // 最初から入れておくもの。外したあとに勝手に戻さない（取り消した行が残るため）
-var FAV_FIRST = { title: 'ゆる～と（全国日帰り温泉・銭湯マップ）', url: 'https://yuru-to.net/', icon: '♨', note: '全国の日帰り温泉・銭湯を地図から探せる' };
+var FAV_FIRST = { title: 'ゆる～と（全国日帰り温泉・銭湯マップ）', url: 'https://yuru-to.net/', icon: '', note: '全国の日帰り温泉・銭湯を地図から探せる' };
 function seedFavorite() {
   var key = FAV_FIRST.url.replace(/\/+$/, '');
   if (!store.st.server.me || store.st.server.col['favorite:' + key] || store.col('favorite')[key]) return;
@@ -1611,14 +1679,14 @@ var MAP_BASES = {
 var MAP_MARK = { 'グルメ': ['食', 1], 'スイーツ': ['甘', 2], 'お酒': ['酒', 3], '旅行': ['旅', 4], 'レシピ': ['膳', 5], 'エンタメ': ['遊', 6], '日記・日常': ['日', 7] };
 var MP = null;
 
-function mapPrefs() { return Object.assign({ base: 'pale', off: {}, rate: 0, names: true, log: true, stamp: false, road: false }, prefs().map || {}); }
+function mapPrefs() { var o = Object.assign({ base: 'pale', off: {}, rate: 0, names: true, log: true, stamp: false, road: false }, prefs().map || {}); if (!FEATURES.out) { o.log = true; o.stamp = o.road = false; } return o; }
 ACT.openMap = function(el) { openMap(el && el.dataset.layer, el && el.dataset.id); };
 function openMap(layer, id) {
   closeAllSheets();
   closeMap();
   var el = document.createElement('div');
   el.id = 'mapView';
-  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">ふたりの地図</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
+  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">FUTARI MAP</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
     '<div class="map-btns">' + [['base', '地図'], ['show', '表示'], ['find', '検索'], ['here', '現在地'], ['fit', '全体'], ['close', '閉じる']].map(function(b) { return '<button type="button" data-act="mapBtn" data-v="' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div><div class="map-card" id="mapCard"></div>';
   document.body.appendChild(el);
   document.body.classList.add('locked');
@@ -1673,15 +1741,16 @@ function drawPins() {
     if (s.to) L.polyline([s.at, s.to], { color: '#5d6778', weight: 2, dashArray: '4 5', interactive: false }).addTo(MP.layer);
     if (!view.contains(s.at)) return;
     shown++;
-    var p = MP.map.project(s.at, z), k = z >= 17 ? s.key : Math.floor(p.x / 38) + ':' + Math.floor(p.y / 38);
+    var p = MP.map.project(s.at, z), k = z >= 18 ? s.key : Math.floor(p.x / 46) + ':' + Math.floor(p.y / 46);
     (cells[k] = cells[k] || []).push(s);
   });
   var keys = Object.keys(cells), names = MP.o.names && (z >= 12 || keys.length <= 25);
   keys.forEach(function(k) {
     var g = cells[k].sort(function(a, b) { return (b.key === MP.sel) - (a.key === MP.sel) || b.rating - a.rating; }), s = g[0], many = g.length > 1;
-    var html = '<div class="pin ' + s.color + (s.rating >= 5 ? ' best' : '') + (s.key === MP.sel ? ' sel' : '') + '">' + esc(s.mark) + (many ? '<b>' + g.length + '</b>' : s.rating ? '<i>' + esc(s.rating) + '</i>' : '') + '</div>' + (names ? '<div class="pin-name">' + esc(s.name) + (many ? ' ほか' : '') + '</div>' : '');
-    L.marker(s.at, { icon: L.divIcon({ className: 'pin-wrap', html: html, iconSize: [26, 26], iconAnchor: [13, 13] }), zIndexOffset: s.key === MP.sel ? 1000 : s.rating * 10, title: s.name }).addTo(MP.layer).on('click', function() {
-      if (many && z < 17 && s.key !== MP.sel) { var b = L.latLngBounds(g.map(function(x) { return x.at; })); if (b.getNorthEast().distanceTo(b.getSouthWest()) > 15) { MP.map.fitBounds(b, { padding: [70, 70], maxZoom: 17 }); return; } }
+    // まとまりは丸い数字、1 件は四角い印。評価は名前の後ろに書き、印には重ねない（★5 は金の縁）
+    var html = many ? '<div class="cluster' + (s.key === MP.sel ? ' sel' : '') + '">' + g.length + '</div>' : '<div class="pin ' + s.color + (s.rating >= 5 ? ' best' : '') + (s.key === MP.sel ? ' sel' : '') + '">' + esc(s.mark) + '</div>' + (names ? '<div class="pin-name">' + esc(s.name) + (s.rating ? '<em>' + esc(Number(s.rating).toFixed(1)) + '</em>' : '') + '</div>' : '');
+    L.marker(s.at, { icon: L.divIcon({ className: 'pin-wrap', html: html, iconSize: many ? [30, 30] : [22, 22], iconAnchor: many ? [15, 15] : [11, 11] }), zIndexOffset: s.key === MP.sel ? 1000 : s.rating * 10, title: s.name }).addTo(MP.layer).on('click', function() {
+      if (many && s.key !== MP.sel) { var b = L.latLngBounds(g.map(function(x) { return x.at; })); if (b.getNorthEast().distanceTo(b.getSouthWest()) > 15) { MP.map.fitBounds(b, { padding: [70, 70], maxZoom: 17 }); return; } }
       MP.group = g; MP.sel = s.key; mapPanel(''); drawMapCard(); drawPins();
     });
   });
@@ -1727,7 +1796,7 @@ function mapPanel(v) {
   var lack = v === 'show' ? store.list('log').filter(function(x) { return !(x.lat && x.lng) && x.address; }).length : 0;
   $('mapPanel').className = 'map-panel p-' + v;
   $('mapPanel').innerHTML = v === 'base' ? '<div class="cells">' + Object.keys(MAP_BASES).map(function(k) { return cell('base', k, MAP_BASES[k][0], o.base === k); }).join('') + '</div>'
-    : v === 'show' ? '<div class="cells">' + cell('layer', 'log', 'ログ', o.log) + cell('layer', 'stamp', '名所', o.stamp) + cell('layer', 'road', '百名道', o.road) + cell('names', '1', '名前', o.names) + '</div><div class="cells">' + Object.keys(cats()).map(function(k) { return cell('cat', k, k, !o.off[k]); }).join('') + '</div><div class="cells">' + [[0, '全評価'], [3, '★3〜'], [4, '★4〜'], [5, '★5']].map(function(r) { return cell('rate', r[0], r[1], o.rate === r[0]); }).join('') + '</div>' + (lack ? '<button type="button" class="wide" data-act="fillGeo">住所だけの ' + lack + ' 件の位置を調べる</button>' : '')
+    : v === 'show' ? '<div class="cells">' + (FEATURES.out ? cell('layer', 'log', 'ログ', o.log) + cell('layer', 'stamp', '名所', o.stamp) + cell('layer', 'road', '百名道', o.road) : '') + cell('names', '1', '名前', o.names) + '</div><div class="cells">' + Object.keys(cats()).map(function(k) { return cell('cat', k, k, !o.off[k]); }).join('') + '</div><div class="cells">' + [[0, '全評価'], [3, '3.0〜'], [4, '4.0〜'], [5, '5.0']].map(function(r) { return cell('rate', r[0], r[1], o.rate === r[0]); }).join('') + '</div>' + (lack ? '<button type="button" class="wide" data-act="fillGeo">住所だけの ' + lack + ' 件の位置を調べる</button>' : '')
     : v === 'find' ? '<input type="search" data-input="mapFind" placeholder="店名・場所・タグ" aria-label="地図の中を検索"><div id="mapFound"></div>' : '';
   if (v === 'find') { INPUT.mapFind({ value: '' }); $('mapPanel').querySelector('input').focus(); }
 }
@@ -1793,8 +1862,8 @@ ACT.settings = function() {
   var st = store.st, pend = Object.keys(pendingPhotos).reduce(function(n, k) { return n + pendingPhotos[k].length; }, 0) - failedPhotos.length, tr = TYPES.reduce(function(n, t) { return n + store.trashed(t).length; }, 0);
   openSheet('設定', '<div class="card"><div class="row between"><b>' + (lsGet(KEY_TOKEN) ? (authRejected ? 'トークンが一致しません' : '接続済み' + (myName() ? '（' + esc(myName()) + '）' : '')) : '未接続') + '</b><button type="button" class="btn small" data-act="connect">接続トークン</button></div><p class="muted">最終同期 ' + esc(st.server.syncedAt || '-') + '・未送信 ' + st.queue.length + ' 件・未送信の写真 ' + pend + ' 枚</p><button type="button" class="btn small" data-act="sync">今すぐ同期</button></div>' +
     (st.failed.length || failedPhotos.length ? '<div class="card"><b>送信できなかったもの</b><p class="muted">内容はこの端末に残っています。</p>' + st.failed.map(function(op) { return '<div class="item" style="flex-wrap:wrap"><div class="grow"><div class="ell">' + esc(opLabel(op)) + '</div><div class="muted">' + esc(op.error) + '</div><details><summary class="muted">内容</summary><div class="text">' + esc(Object.keys(op.set || {}).map(function(k) { return op.set[k] ? k + ': ' + op.set[k] : ''; }).filter(Boolean).join('\n')) + '</div></details></div><button type="button" class="btn small" data-act="failRetry" data-id="' + esc(op.qid) + '">再送</button><button type="button" class="btn small danger" data-act="failDrop" data-id="' + esc(op.qid) + '">破棄</button></div>'; }).join('') + failedPhotos.map(function(p) { return '<div class="item"><div class="thumb">' + photoTag({ id: p.id }, 'thumb') + '</div><div class="grow muted">写真：' + esc(p.error) + '</div><button type="button" class="btn small" data-act="phRetry" data-id="' + esc(p.id) + '">再送</button><button type="button" class="btn small danger" data-act="phDrop" data-id="' + esc(p.id) + '">破棄</button></div>'; }).join('') + '</div>' : '') +
-    '<div class="card"><label><span class="lbl">起動したときの画面</span><select data-change="startTab">' + options([['log', 'ログ'], ['plan', 'プラン'], ['memo', 'メモ'], ['out', 'おでかけ']], prefs().start || 'log') + '</select></label></div>' +
-    '<button type="button" class="btn more" data-act="trashBox">ゴミ箱（' + tr + '）</button><button type="button" class="btn more" data-act="handover">旧アプリのデータを取り込む</button><p class="muted">版 ' + esc(window.APP_VERSION || 'preview') + '</p>');
+    '<div class="card"><label><span class="lbl">起動したときの画面</span><select data-change="startTab">' + options([['log', 'ログ'], ['plan', 'プラン'], ['memo', 'メモ']].concat(FEATURES.out ? [['out', 'おでかけ']] : []), FEATURES[prefs().start] === false ? 'log' : prefs().start || 'log') + '</select></label></div>' +
+    '<button type="button" class="btn more" data-act="trashBox">ゴミ箱（' + tr + '）</button>' + (FEATURES.out ? '<button type="button" class="btn more" data-act="handover">旧アプリのデータを取り込む</button>' : '') + '<p class="muted">版 ' + esc(window.APP_VERSION || 'preview') + '</p>');
 };
 function reopenSettings() { closeSheet(); ACT.settings(); }
 INPUT.startTab = function(el) { setPref('start', el.value); };
