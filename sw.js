@@ -1,5 +1,5 @@
 // 端末内の画面を即座に返す（通信を待たない）。更新は裏で取得し、次回の起動から反映する
-const CACHE = 'couplelog-app-932a93359d4a', INBOX = 'couplelog-inbox';
+const CACHE = 'couplelog-app-8d2dd482b69c', INBOX = 'couplelog-inbox';
 const ASSETS = ["./app.css","./app.js","./vendor/leaflet.js","./vendor/leaflet.css","./icon-192.png","./icon-512.png","./manifest.json","./index.html","./config.js"];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

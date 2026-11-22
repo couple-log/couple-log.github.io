@@ -112,7 +112,8 @@ function gpsFromTiff(v, t) {
 var ICONS = {
   log: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5', plan: 'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.700 19.4l1.200-6L3.400 9.300l6-.7z', memo: 'M6 3h9l4 4v14H6zM14 3v5h5', out: 'M12 21s7-6.500 7-12a7 7 0 10-14 0c0 5.500 7 12 7 12zM12 11.500a2.500 2.500 0 100-5 2.500 2.500 0 000 5z',
   plus: 'M12 5v14M5 12h14', search: 'M11 18a7 7 0 100-14 7 7 0 000 14zM16 16l5 5', gear: 'M4 7h9M19 7h1M4 17h1M11 17h9M16 9.500a2.500 2.500 0 100-5 2.500 2.500 0 000 5zM8 19.500a2.500 2.500 0 100-5 2.500 2.500 0 000 5z',
-  close: 'M6 6l12 12M18 6L6 18', heart: 'M12 20s-7.500-4.600-9-9.500C2 7 4.500 4.500 7.500 4.500c2 0 3.500 1.200 4.500 2.700 1-1.500 2.500-2.700 4.500-2.700 3 0 5.500 2.500 4.500 6C19.500 15.400 12 20 12 20z', check: 'M5 12.500l4.500 4.500L19 7.500', pin: 'M9 3h6l-1 6 4 4H6l4-4zM12 13v8', clock: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3.500 2', left: 'M15 5l-7 7 7 7', right: 'M9 5l7 7-7 7', camera: 'M4 8h4l1.500-3h5L16 8h4v11H4zM12 16.500a3.500 3.500 0 100-7 3.500 3.500 0 000 7z'
+  flag: 'M6 21V4h11l-2 4 2 4H6',
+  close: 'M6 6l12 12M18 6L6 18', down: 'M6 9l6 6 6-6', up: 'M6 15l6-6 6 6', edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4', map: 'M9 4L3 6.500v13.500l6-2.500 6 2.500 6-2.500V4l-6 2.500zM9 4v13.500M15 6.500V20', heart: 'M12 20s-7.500-4.600-9-9.500C2 7 4.500 4.500 7.500 4.500c2 0 3.500 1.200 4.500 2.700 1-1.500 2.500-2.700 4.500-2.700 3 0 5.500 2.500 4.500 6C19.500 15.400 12 20 12 20z', check: 'M5 12.500l4.500 4.500L19 7.500', pin: 'M9 3h6l-1 6 4 4H6l4-4zM12 13v8', clock: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3.500 2', left: 'M15 5l-7 7 7 7', right: 'M9 5l7 7-7 7', camera: 'M4 8h4l1.500-3h5L16 8h4v11H4zM12 16.500a3.500 3.500 0 100-7 3.500 3.500 0 000 7z'
 };
 function icon(n) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICONS[n] + '"/></svg>'; }
 
@@ -555,7 +556,6 @@ function catOf(c) { return cats()[c] || { sub: [], scores: [], prices: [] }; }
 var GOAL_CATS = ['暮らし・習慣', '旅行・お出かけ', 'グルメ・料理', '健康・運動', '家計・貯蓄', 'その他'];
 var HOL_STATUS = ['白紙・募集中', '計画中', '手配済', '完了'];
 var BUCKET_CATS = ['旅行・絶景', 'グルメ・食', '体験・挑戦', '暮らし・家', '記念・イベント'];
-var MEMO_CATS = ['ナレッジ・メモ', 'Webクリップ', '買い物・手続き', '料理・レシピメモ', 'アイデア', 'その他'];
 var RECIPE = '【材料（2人分）】\n・\n・\n\n【作り方】\n1. \n2. \n\n【ポイント・感想】\n';
 function whenOptions() { var y = new Date().getFullYear(); return ['', y + '年内', (y + 1) + '年', (y + 2) + '年', '3年以内', '5年以内', 'いつか必ず']; }
 function isDone(s) { return s === '達成' || s === '達成済' || s === '完了'; }
@@ -656,7 +656,7 @@ document.addEventListener('submit', function(e) {
   var f = e.target;
   if (SUBMIT[f.dataset.submit]) SUBMIT[f.dataset.submit](f);
 });
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { if (document.getElementById('lightbox')) closeLightbox(); else closeSheet(); } });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { if (document.getElementById('lightbox')) closeLightbox(); else if (APP.sheets.length) closeSheet(); else closeMap(); } });
 
 function $(id) { return document.getElementById(id); }
 function options(list, cur) {
@@ -685,7 +685,7 @@ function closeSheet() {
   if (!el) return;
   if (el._onClose) el._onClose();
   el.remove();
-  if (!APP.sheets.length) document.body.classList.remove('locked');
+  if (!APP.sheets.length && !$('mapView')) document.body.classList.remove('locked');
 }
 function closeAllSheets() { while (APP.sheets.length) closeSheet(); }
 function topSheet() { return APP.sheets[APP.sheets.length - 1]; }
@@ -706,13 +706,13 @@ ACT.undo = function() { if (APP.undo) APP.undo(); APP.undo = null; $('toast').cl
 // fields: [{k, label, type: text|textarea|select|date|url|month, options, ph, required}]
 function openForm(cfg) {
   var v = cfg.values || {};
-  var html = '<form data-submit="form" class="form">' + cfg.fields.map(function(f) {
+  var html = '<form data-submit="form" class="form">' + (cfg.head || '') + cfg.fields.map(function(f) {
     var val = v[f.k] === undefined || v[f.k] === null ? '' : String(v[f.k]), at = ' name="' + f.k + '"' + (f.required ? ' required' : '');
     var input = f.type === 'textarea' ? '<textarea rows="4"' + at + ' placeholder="' + esc(f.ph || '') + '">' + esc(val) + '</textarea>'
       : f.type === 'select' ? '<select' + at + (f.change ? ' data-change="' + f.change + '"' : '') + '>' + options(f.options, val) + '</select>'
       : '<input type="' + (f.type || 'text') + '"' + at + ' value="' + esc(val) + '" placeholder="' + esc(f.ph || '') + '">';
     return '<label class="' + (f.half ? 'half' : '') + '"><span>' + esc(f.label) + '</span>' + input + '</label>';
-  }).join('') + (cfg.extra || '') + '<div class="form-foot">' + (cfg.onDelete ? '<button type="button" class="btn danger" data-act="formDelete">ゴミ箱へ</button>' : '') + '<button class="btn primary" type="submit">' + esc(cfg.saveLabel || '保存') + '</button></div></form>';
+  }).join('') + (cfg.extra || '') + '<div class="form-foot stick">' + (cfg.onDelete ? '<button type="button" class="btn danger" data-act="formDelete">ゴミ箱へ</button>' : '') + '<button class="btn primary" type="submit">' + esc(cfg.saveLabel || '保存') + '</button></div></form>';
   var el = openSheet(cfg.title, html);
   el._form = cfg;
   return el;
@@ -743,15 +743,15 @@ function saveEdited(type, original, val) {
 function renderBadge() {
   var b = $('syncBadge'); if (!b) return;
   var wait = store.st.queue.length + Object.keys(pendingPhotos).reduce(function(n, k) { return n + pendingPhotos[k].length; }, 0) - failedPhotos.length, bad = store.st.failed.length + failedPhotos.length;
-  var t = bad ? '失敗 ' + bad : authRejected ? '要接続' : !lsGet(KEY_TOKEN) ? '未接続' : wait > 0 ? '未送信 ' + wait : APP.syncing ? '同期中' : '';
+  var t = bad ? '失敗 ' + bad : authRejected ? '要接続' : APP.syncError ? '同期エラー' : !lsGet(KEY_TOKEN) ? '未接続' : wait > 0 ? '未送信 ' + wait : APP.syncing ? '同期中' : '';
   b.textContent = t;
-  b.className = 'badge' + (bad || authRejected ? ' bad' : '');
+  b.className = 'badge' + (bad || authRejected || APP.syncError ? ' bad' : '');
   b.hidden = !t;
 }
 function sync(manual) {
   if (APP.syncing) return APP.syncing;
   if (!canCall()) { renderBadge(); if (manual) toast(lsGet(KEY_TOKEN) ? '今は通信できません' : '接続トークンが未設定です'); return Promise.resolve(); }
-  APP.syncing = store.pull().then(uploadPhotos).then(function() { return store.flush(); }).then(function() { if (manual) toast('最新の状態です'); }, function(e) { if (manual) toast(e.message); console.warn(e.message); })
+  APP.syncing = store.pull().then(function() { APP.syncError = ''; seedFavorite(); return uploadPhotos(); }).then(function() { return store.flush(); }).then(function() { if (manual) toast('最新の状態です'); }, function(e) { if (e.code !== 'NETWORK') APP.syncError = e.message; if (manual) toast(e.message); console.warn(e.message); })
     .then(function() { APP.syncing = null; renderBadge(); });
   renderBadge();
   return APP.syncing;
@@ -764,6 +764,7 @@ function renderSoon() { if (!renderTimer) renderTimer = setTimeout(function() { 
 // 入力中の欄があるときは作り直さない（日本語変換が切れるため）
 function render() {
   renderBadge();
+  if ($('favBox')) $('favBox').innerHTML = favHtml();
   var a = document.activeElement, main = $('main');
   if (a && main.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName)) { if (RENDER[APP.tab + 'List']) RENDER[APP.tab + 'List'](); return; }
   RENDER[APP.tab]();
@@ -776,7 +777,7 @@ function go(tab) {
   watchPhotos($('main'));
   window.scrollTo(0, 0);
 }
-ACT.go = function(el) { closeAllSheets(); go(el.dataset.tab); };
+ACT.go = function(el) { closeAllSheets(); closeMap(); go(el.dataset.tab); };
 
 // ---- 写真の全画面 ----
 function openLightbox(photos, i) {
@@ -805,11 +806,6 @@ function needLeaflet() {
   });
   return leafletPromise;
 }
-function makeMap(el, center, zoom) {
-  var m = L.map(el, { zoomControl: true }).setView(center, zoom);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' }).addTo(m);
-  return m;
-}
 
 var store = createStore({
   persist: { server: function(v) { return kvSet('server', v); }, queue: function(v) { return kvSet('queue', v); }, failed: function(v) { return kvSet('failed', v); } },
@@ -821,6 +817,8 @@ function myName() { return store.st.server.me ? store.st.server.me.name : ''; }
 
 // 端末の控えだけで画面を出す。通信はその後
 function boot() {
+  // iPhone は 16px 未満の入力欄で画面が勝手に拡大されるため、拡大の上限だけを付ける（指での拡大は使える）
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) document.querySelector('meta[name=viewport]').content += ', maximum-scale=1';
   Promise.all([kvGet('server'), kvGet('queue'), kvGet('failed'), refreshPending()]).then(function(r) { store.load({ server: r[0], queue: r[1], failed: r[2] }); }, function(e) {
     console.warn(e);
     toast('端末内の保存領域を開けません。プライベートブラウズを解除してください');
@@ -841,9 +839,76 @@ function boot() {
 }
 
 // ============================================================
+// Core_Tags : タグの読み書きと入力部品
+// ============================================================
+// タグ列（カンマ区切り）+ 本文の #タグ + 元の分類 から作る。
+// 元の分類は書き換えず、外したものだけを「!名前」として残す（元のデータを壊さないため）
+var WANT_TAG = '気になる';
+
+function cleanTag(s) { return String(s || '').replace(/^[#＃!！\s　]+/, '').replace(/[,、，\s　]+/g, '').slice(0, 30); }
+function sameTag(a, b) { return a.toLowerCase() === b.toLowerCase(); }
+function hasTag(list, t) { return list.some(function(x) { return sameTag(x, t); }); }
+
+function derivedTags(type, x) {
+  var base = type === 'wish' ? [WANT_TAG, x.category, x.subCategory] : type === 'memo' ? [x.category] : [];
+  var text = (x.title || '') + '\n' + ((type === 'memo' ? x.content : x.memo) || '');
+  return base.filter(function(t) { return t && t !== 'その他'; }).concat(extractTags(text).map(function(t) { return t.slice(1); })).map(cleanTag);
+}
+function tagsOf(type, x) {
+  var own = splitList(x.tags), hide = own.filter(function(t) { return t[0] === '!'; }).map(function(t) { return t.slice(1); }), out = [];
+  own.filter(function(t) { return t[0] !== '!'; }).concat(derivedTags(type, x)).forEach(function(t) { if (t && !hasTag(hide, t) && !hasTag(out, t)) out.push(t); });
+  return out;
+}
+// 選んだタグを、タグ列に書く値にする
+function tagsValue(type, x, chosen) {
+  var d = derivedTags(type, x);
+  return chosen.filter(function(t) { return !hasTag(d, t); }).concat(d.filter(function(t, i) { return !hasTag(chosen, t) && d.findIndex(function(u) { return sameTag(u, t); }) === i; }).map(function(t) { return '!' + t; })).join(',');
+}
+// 編集で本文に書き足した #タグ（保存のときに選んだタグへ加える）
+function writtenTags(type, before, after) { var old = derivedTags(type, before || {}); return derivedTags(type, after).filter(function(t) { return !hasTag(old, t); }); }
+// 使った回数の多い順。weight で同じ分類のものを優先できる
+function tagStats(weight) {
+  var n = {}, w = {}, label = {};
+  ['log', 'memo', 'wish'].forEach(function(type) {
+    store.list(type).forEach(function(x) {
+      var k = weight ? weight(type, x) : 1;
+      tagsOf(type, x).forEach(function(t) { var key = t.toLowerCase(); n[key] = (n[key] || 0) + 1; w[key] = (w[key] || 0) + k; label[key] = label[key] || t; });
+    });
+  });
+  return Object.keys(n).sort(function(a, b) { return w[b] - w[a] || n[b] - n[a]; }).map(function(k) { return { tag: label[k], n: n[k] }; });
+}
+function tagButtons(list) { return list.map(function(t) { return '<button type="button" class="tag" data-act="tag" data-tag="#' + esc(t) + '">#' + esc(t) + '</button>'; }).join(''); }
+
+// ---- 入力部品（候補を押すだけで付く。打ち込んで Enter でも付く） ----
+var TP = null; // {list, quick: 先に出す候補, weight, on: 変わったとき}
+function tagBox(opt) { TP = opt; return '<div class="tagbox"><div id="tagSel"></div><input id="tagInput" data-input="tagInput" data-change="tagCommit" placeholder="タグを入力して Enter（#は不要）" autocomplete="off" enterkeyhint="done" aria-label="タグを追加"><div class="chips wrap" id="tagSug"></div></div>'; }
+function drawTags() {
+  if (!TP || !$('tagSel')) return;
+  $('tagSel').innerHTML = TP.list.map(function(t) { return '<button type="button" class="chip on" data-act="tagDel" data-tag="' + esc(t) + '" aria-label="タグ ' + esc(t) + ' を外す">#' + esc(t) + icon('close') + '</button>'; }).join('');
+  $('tagSel').className = TP.list.length ? 'chips wrap' : '';
+  drawTagSug();
+}
+function drawTagSug() {
+  var q = cleanTag($('tagInput').value).toLowerCase(), all = (TP.quick || []).concat(tagStats(TP.weight).map(function(t) { return t.tag; })), out = [];
+  all.forEach(function(t) { if (!hasTag(out, t) && !hasTag(TP.list, t) && !(TP.skip && hasTag(TP.skip, t)) && (!q || t.toLowerCase().indexOf(q) >= 0)) out.push(t); });
+  $('tagSug').innerHTML = (q && !hasTag(all, q) ? '<button type="button" class="chip new" data-act="tagAdd" data-tag="' + esc(cleanTag($('tagInput').value)) + '">「' + esc(cleanTag($('tagInput').value)) + '」を追加</button>' : '') + out.slice(0, q ? 8 : 12).map(function(t) { return '<button type="button" class="chip" data-act="tagAdd" data-tag="' + esc(t) + '">＋' + esc(t) + '</button>'; }).join('');
+}
+function putTag(raw) {
+  var t = cleanTag(raw);
+  if (t && TP && !hasTag(TP.list, t)) { TP.list.push(t); if (TP.on) TP.on(); }
+}
+// 打ちかけのタグも、保存するときに取りこぼさない
+function commitTagInput() { var el = $('tagInput'); if (el && TP && cleanTag(el.value)) { putTag(el.value); el.value = ''; drawTags(); } }
+ACT.tagAdd = function(el) { putTag(el.dataset.tag); $('tagInput').value = ''; drawTags(); };
+ACT.tagDel = function(el) { TP.list = TP.list.filter(function(t) { return t !== el.dataset.tag; }); if (TP.on) TP.on(); drawTags(); };
+INPUT.tagInput = function(el, e) { if (!e.isComposing && /[,、，\s　]$/.test(el.value)) commitTagInput(); else drawTagSug(); };
+INPUT.tagCommit = function() { if (!document.activeElement || document.activeElement.id === 'tagInput') commitTagInput(); };
+document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && e.target.id === 'tagInput' && !e.isComposing) { e.preventDefault(); commitTagInput(); } });
+
+// ============================================================
 // Mod_Log : ログの一覧（写真 / ブログ / カード / 表 / 地図）・詳細・再訪・タイムカプセル
 // ============================================================
-var LV = { view: prefs().logView || 'photo', q: '', cat: '', sub: '', rating: '', author: '', sort: 'new', shown: 30, open: false, capsule: 0, capsuleOff: false, map: null };
+var LV = { view: ['photo', 'blog', 'card', 'table'].indexOf(prefs().logView) >= 0 ? prefs().logView : 'photo', q: '', cat: '', sub: '', rating: '', author: '', sort: 'new', shown: 30, open: false, capsule: 0, capsuleOff: false, long: {} };
 
 function sortedLogs() { return store.list('log').slice().sort(function(a, b) { return dateKey(b.timestamp).localeCompare(dateKey(a.timestamp)) || String(b.id).localeCompare(String(a.id)); }); }
 function scoresOf(l) { return [l.s1, l.s2, l.s3, l.s4, l.s5]; }
@@ -855,8 +920,8 @@ function filteredLogs() {
     if (LV.sub && x.subCategory !== LV.sub) return false;
     if (LV.rating && Math.round(x.rating || 0) !== Number(LV.rating)) return false;
     if (LV.author && x.author !== LV.author) return false;
-    if (LV.q[0] === '#') return extractTags(x.title + '\n' + x.memo).some(function(t) { return t.toLowerCase() === LV.q.toLowerCase(); }) || matches(x.memo + '', LV.q);
-    return !LV.q || matches([x.title, x.memo, x.category, x.subCategory, x.address, x.author].join(' '), LV.q);
+    if (LV.q[0] === '#') return hasTag(tagsOf('log', x), LV.q.slice(1)) || (LV.typing && matches(tagsOf('log', x).join(' '), LV.q.slice(1)));
+    return !LV.q || matches([x.title, x.memo, x.category, x.subCategory, x.address, x.author, tagsOf('log', x).join(' ')].join(' '), LV.q);
   });
   if (LV.sort === 'old') l.reverse();
   if (LV.sort === 'rate') l.sort(function(a, b) { return (b.rating || 0) - (a.rating || 0); });
@@ -875,18 +940,17 @@ function visitBadge(l, ix) {
   return '<button type="button" class="pill ' + (v.length >= 3 ? 'gold' : '') + '" data-act="visits" data-id="' + esc(l.id) + '">' + (v.indexOf(l.id) + 1) + '回目' + (v.length >= 3 ? '・殿堂入り' : '') + '</button>';
 }
 
-function allTags() {
-  var n = {}, label = {};
-  var add = function(text) { extractTags(text).forEach(function(t) { var k = t.toLowerCase(); n[k] = (n[k] || 0) + 1; label[k] = label[k] || t; }); };
-  store.list('log').forEach(function(l) { add(l.title + '\n' + l.memo); });
-  store.list('memo').forEach(function(m) { add(m.title + '\n' + m.content); });
-  return Object.keys(n).sort(function(a, b) { return n[b] - n[a]; }).map(function(k) { return { tag: label[k], n: n[k] }; });
+function logTags() {
+  var n = {};
+  store.list('log').forEach(function(l) { tagsOf('log', l).forEach(function(t) { n[t] = (n[t] || 0) + 1; }); });
+  return Object.keys(n).sort(function(a, b) { return n[b] - n[a]; });
 }
+function taglist(type, x) { var t = tagsOf(type, x); return t.length ? '<div class="taglist">' + tagButtons(t) + '</div>' : ''; }
 
 RENDER.log = function() {
-  var views = [['photo', '写真'], ['blog', 'ブログ'], ['card', 'カード'], ['table', '表'], ['map', '地図']];
+  var views = [['photo', '写真'], ['blog', 'ブログ'], ['card', 'カード'], ['table', '表']];
   var active = [LV.cat, LV.sub, LV.rating, LV.author].filter(Boolean).length;
-  $('main').innerHTML = '<div class="seg">' + views.map(function(v) { return '<button type="button" class="' + (LV.view === v[0] ? 'on' : '') + '" data-act="logView" data-v="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '</div>' +
+  $('main').innerHTML = '<div class="seg">' + views.map(function(v) { return '<button type="button" class="' + (LV.view === v[0] ? 'on' : '') + '" data-act="logView" data-v="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '<button type="button" data-act="openMap" data-layer="log">地図</button></div>' +
     '<div class="row"><input type="search" class="grow" placeholder="検索・#タグ" value="' + esc(LV.q) + '" data-input="logQ" aria-label="ログを検索"><button type="button" class="btn" data-act="logFilter" aria-expanded="' + LV.open + '">絞り込み' + (active ? ' ' + active : '') + '</button></div>' +
     '<div class="filters"' + (LV.open ? '' : ' hidden') + '>' +
       '<select data-change="logF" data-k="cat" aria-label="大分類">' + options([['', '大分類']].concat(Object.keys(cats())), LV.cat) + '</select>' +
@@ -895,15 +959,13 @@ RENDER.log = function() {
       '<select data-change="logF" data-k="author" aria-label="投稿者">' + options([['', '投稿者']].concat(names()), LV.author) + '</select>' +
       '<select data-change="logF" data-k="sort" aria-label="並べ替え">' + options([['new', '新しい順'], ['old', '古い順'], ['rate', '評価の高い順']], LV.sort) + '</select>' +
       '<button type="button" class="btn small" data-act="logClear">条件を消す</button></div>' +
-    '<div class="chips" style="margin:6px 0 10px">' + allTags().slice(0, 12).map(function(t) { return '<button type="button" class="chip ' + (LV.q.toLowerCase() === t.tag.toLowerCase() ? 'on' : '') + '" data-act="tag" data-tag="' + esc(t.tag) + '">' + esc(t.tag) + '</button>'; }).join('') + '</div>' +
+    '<div class="chips tagrow">' + logTags().slice(0, 14).map(function(t) { return '<button type="button" class="chip ' + (LV.q.toLowerCase() === '#' + t.toLowerCase() ? 'on' : '') + '" data-act="tag" data-tag="#' + esc(t) + '">#' + esc(t) + '</button>'; }).join('') + '</div>' +
     '<div id="capsule"></div><div id="logList"></div>';
   RENDER.logList();
 };
 RENDER.logList = function() {
   renderCapsule();
   var box = $('logList'), l = filteredLogs(), ix = visitIndex();
-  if (LV.map) { LV.map.remove(); LV.map = null; }
-  if (LV.view === 'map') return renderLogMap(box, l);
   if (!l.length) { box.innerHTML = '<div class="empty">' + (store.list('log').length ? '条件に合う記録がありません' : '下の ＋ から最初の記録を追加できます') + '</div>'; return; }
   var page = l.slice(0, LV.shown), html = '';
   if (LV.view === 'photo') html = '<div class="pgrid">' + page.map(function(x) {
@@ -916,51 +978,50 @@ RENDER.logList = function() {
   else html = page.map(function(x) { return LV.view === 'blog' ? blogCard(x, ix) : dataCard(x, ix); }).join('');
   box.innerHTML = html + (l.length > LV.shown ? '<button type="button" class="btn more" data-act="logMore">もっと見る（残り ' + (l.length - LV.shown) + '）</button>' : '');
   watchPhotos($('main'));
+  checkLong(box);
+};
+
+// 長い文章は畳み、「続きを読む」で全部を開く（畳む必要があるときだけボタンを出す）
+function longText(text, photos, key, lines) {
+  if (!text) return '';
+  var open = LV.long[key];
+  return '<div class="long' + (open ? ' open' : '') + '"><div class="text" style="--lines:' + lines + '">' + richText(text, photos) + '</div><button type="button" class="morelink" data-act="longToggle" data-key="' + esc(key) + '"' + (open ? '' : ' hidden') + '>' + (open ? '閉じる' : '続きを読む') + '</button></div>';
+}
+function checkLong(root) { root.querySelectorAll('.long:not(.open)').forEach(function(el) { var t = el.firstChild; el.lastChild.hidden = t.scrollHeight <= t.clientHeight + 2; }); }
+ACT.longToggle = function(el) {
+  var box = el.parentNode, on = box.classList.toggle('open');
+  LV.long[el.dataset.key] = on;
+  el.textContent = on ? '閉じる' : '続きを読む';
+  if (on) watchPhotos(box); else box.closest('article').scrollIntoView({ block: 'nearest' });
 };
 function headRow(x, ix) {
   return '<div class="row between"><span class="muted ell">' + esc(dateLabel(x.timestamp)) + '・' + esc(x.category) + (x.subCategory ? ' / ' + esc(x.subCategory) : '') + '</span><span class="muted">' + esc(x.author) + '</span></div><h2 class="tap" data-act="logOpen" data-id="' + esc(x.id) + '">' + esc(x.title || '無題') + '</h2><div class="row">' + stars(x.rating) + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</div>';
 }
 function blogCard(x, ix) {
   var p = photosOf(x);
-  return '<article class="card" data-id="' + esc(x.id) + '">' + headRow(x, ix) + (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') + (x.memo ? '<div class="text clamp">' + richText(x.memo, p) + '</div>' : '') + (x.address ? '<div class="muted ell">' + esc(x.address) + '</div>' : '') + '</article>';
+  return '<article class="card" data-id="' + esc(x.id) + '">' + headRow(x, ix) + (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') + longText(x.memo, p, 'log:' + x.id, 8) + taglist('log', x) + (x.address ? '<div class="muted ell">' + esc(x.address) + '</div>' : '') + '</article>';
 }
 function dataCard(x, ix) {
-  var p = photosOf(x);
-  return '<article class="card" data-id="' + esc(x.id) + '"><div class="row"><div class="grow">' + headRow(x, ix) + (x.price ? '<div class="muted">' + esc(x.price) + '</div>' : '') + '</div>' + (radar(catOf(x.category).scores, scoresOf(x), 104) || (p.length ? '<div class="thumb">' + photoTag(p[0], 'thumb') + '</div>' : '')) + '</div></article>';
+  var p = photosOf(x), m = MAP_MARK[x.category] || ['記', 7], labels = catOf(x.category).scores, sc = scoresOf(x);
+  return '<article class="card dcard" data-id="' + esc(x.id) + '"><button type="button" class="dthumb" data-act="logOpen" data-id="' + esc(x.id) + '" aria-label="' + esc(x.title) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="pin pin-' + m[1] + '">' + m[0] + '</span>') + '</button>' +
+    '<div class="dbody"><div class="muted ell">' + esc(dateLabel(x.timestamp)) + '・' + esc(x.author) + '</div><h3 class="tap ell2" data-act="logOpen" data-id="' + esc(x.id) + '">' + esc(x.title || '無題') + '</h3><div class="muted ell">' + esc([x.category, x.subCategory, x.price].filter(Boolean).join('・')) + '</div><div class="row wrap">' + stars(x.rating) + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</div></div>' +
+    (labels.length && sc.some(function(s) { return s > 0; }) ? '<div class="bars">' + labels.map(function(t, i) { var s = Number(sc[i]) || 0; return '<div><span class="ell">' + esc(t) + '</span><em><i style="width:' + Math.min(100, s * 20) + '%"></i></em><b>' + (s || '-') + '</b></div>'; }).join('') + '</div>' : '') + '</article>';
 }
 
-function renderLogMap(box, l) {
-  var has = l.filter(function(x) { return x.lat && x.lng; }), lack = l.filter(function(x) { return !(x.lat && x.lng) && x.address; });
-  box.innerHTML = '<div class="map" id="logMap"></div><p class="muted" style="margin-top:6px">場所のある記録 ' + has.length + ' 件。地図の画像は OpenStreetMap から取得します（表示した範囲が伝わります）。</p>' + (lack.length ? '<button type="button" class="btn small" data-act="fillGeo">住所だけの ' + lack.length + ' 件の位置を調べる</button>' : '');
-  needLeaflet().then(function() {
-    if (!$('logMap') || APP.tab !== 'log' || LV.view !== 'map') return;
-    if (LV.map) LV.map.remove();
-    LV.map = makeMap($('logMap'), [36.2, 137.8], 5);
-    var b = [];
-    has.forEach(function(x) {
-      b.push([x.lat, x.lng]);
-      L.marker([x.lat, x.lng], { icon: L.divIcon({ className: '', html: '<div class="mk"></div>', iconSize: [24, 24], iconAnchor: [12, 28] }) }).addTo(LV.map)
-        .bindPopup('<b>' + esc(x.title) + '</b><br>' + esc(dateKey(x.timestamp).slice(0, 10)) + '<br><button type="button" data-act="logOpen" data-id="' + esc(x.id) + '">記録を見る</button>');
-    });
-    if (b.length) LV.map.fitBounds(b, { padding: [36, 36], maxZoom: 13 });
-  }).catch(function(e) { box.insertAdjacentHTML('afterbegin', '<p class="empty">' + esc(e.message) + '</p>'); });
-}
-// 座標はサーバーで求めてシートに保存する（次からは求めない）
-ACT.fillGeo = function(el) {
-  var lack = filteredLogs().filter(function(x) { return !(x.lat && x.lng) && x.address; }).slice(0, 20), ok = 0;
-  el.disabled = true;
-  lack.reduce(function(p, x) {
-    return p.then(function() { return callApi('geocode', { query: x.address }); }).then(function(g) { if (g.found) { ok++; store.patch('log', x.id, { lat: g.lat, lng: g.lng }); } });
-  }, Promise.resolve()).then(function() { toast(ok + ' 件の位置が分かりました'); }, function(e) { toast(e.message); });
-};
 
 ACT.logView = function(el) { LV.view = el.dataset.v; LV.shown = 30; setPref('logView', LV.view); RENDER.log(); };
 ACT.logFilter = function() { LV.open = !LV.open; RENDER.log(); };
 ACT.logClear = function() { LV.cat = LV.sub = LV.rating = LV.author = LV.q = ''; LV.sort = 'new'; RENDER.log(); };
 ACT.logMore = function() { LV.shown += 30; RENDER.logList(); };
-INPUT.logQ = function(el) { LV.q = el.value.trim(); LV.shown = 30; RENDER.logList(); };
+INPUT.logQ = function(el) { LV.typing = true; LV.q = el.value.trim(); LV.shown = 30; RENDER.logList(); };
 INPUT.logF = function(el) { LV[el.dataset.k] = el.value; if (el.dataset.k === 'cat') LV.sub = ''; LV.shown = 30; RENDER.log(); };
-ACT.tag = function(el) { closeAllSheets(); if (APP.tab === 'memo') { MV.q = MV.q === el.dataset.tag ? '' : el.dataset.tag; RENDER.memo(); return; } LV.q = LV.q === el.dataset.tag ? '' : el.dataset.tag; LV.shown = 30; go('log'); };
+ACT.tag = function(el) {
+  var t = el.dataset.tag;
+  closeAllSheets(); closeMap();
+  if (APP.tab === 'memo') { MV.tag = MV.tag && sameTag(MV.tag, t.slice(1)) ? '' : t.slice(1); RENDER.memo(); return; }
+  LV.typing = false; LV.q = LV.q.toLowerCase() === t.toLowerCase() ? '' : t; LV.shown = 30;
+  go('log');
+};
 ACT.lightbox = function(el) { var host = el.closest('[data-id]'), x = host && store.get('log', host.dataset.id); if (x) openLightbox(photosOf(x), Number(el.dataset.i)); };
 
 // ---- 詳細 ----
@@ -973,8 +1034,8 @@ function openLog(id) {
   openSheet(x.title || '無題', '<div data-id="' + esc(id) + '">' + headRow(x, visitIndex()) +
     (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') +
     (r ? '<div class="row">' + r + '<div class="muted">' + labels.map(function(t, i) { return esc(t) + ' ' + (scoresOf(x)[i] || '-'); }).join('<br>') + '</div></div>' : '') +
-    (x.price ? '<p class="muted">' + esc(x.price) + '</p>' : '') + (x.memo ? '<div class="text" style="margin:8px 0">' + richText(x.memo, p) + '</div>' : '') +
-    (x.address || x.lat ? '<p><a href="' + esc(mapUrl(x.address ? q : x.lat + ',' + x.lng)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.address || '地図で見る') + '</a></p>' : '') +
+    (x.price ? '<p class="muted">' + esc(x.price) + '</p>' : '') + (x.memo ? '<div class="text full">' + richText(x.memo, p) + '</div>' : '') + taglist('log', x) +
+    (x.address || x.lat ? '<p><a href="' + esc(mapUrl(x.address ? q : x.lat + ',' + x.lng)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.address || '地図で見る') + '</a>' + (x.lat ? ' <button type="button" class="btn small" data-act="openMap" data-layer="log" data-id="' + esc(id) + '">地図</button>' : '') + '</p>' : '') +
     '<div class="form-foot"><button type="button" class="btn danger" data-act="logTrash">ゴミ箱へ</button><button type="button" class="btn primary" data-act="logEdit">編集</button></div></div>');
 }
 ACT.logTrash = function(el) { var id = el.closest('[data-id]').dataset.id; closeSheet(); trashItem('log', id); };
@@ -1009,56 +1070,67 @@ ACT.capClose = function() { LV.capsuleOff = true; renderCapsule(); };
 // ============================================================
 // Mod_LogForm : ログの追加・編集（書きかけを端末に残す）
 // ============================================================
-var LF = null; // {id, isNew, original, v(値), urls, ids(送信済み), pend(未送信), drafts(今回足した写真)}
+var LF = null; // {id, isNew, original, v(値), tags, urls, ids(送信済み), pend(未送信), drafts(今回足した写真)}
 
 function readDraft() { try { return JSON.parse(lsGet(KEY_DRAFT)) || null; } catch (e) { return null; } }
 // 別の書きかけがあるときに（気になるの「訪問した」などから）開いた場合は、元の書きかけに触らない
 function saveDraft() {
   if (!LF || !LF.isNew || !LF.ownsDraft) return;
   var any = String(LF.v.title || LF.v.memo || '').trim() || LF.drafts.length;
-  lsSet(KEY_DRAFT, any ? JSON.stringify({ v: LF.v, drafts: LF.drafts, wishId: LF.wishId || '' }) : '');
+  lsSet(KEY_DRAFT, any ? JSON.stringify({ v: LF.v, drafts: LF.drafts, tags: LF.tags, noteKey: LF.noteKey || '' }) : '');
 }
 function clearDraft() { if (LF && LF.ownsDraft) lsSet(KEY_DRAFT, ''); }
 
-// opt: {id} 編集 / {preset, wishId, photos} 追加
+// opt: {id} 編集 / {preset, noteKey, photos} 追加
 function openLogForm(opt) {
   opt = opt || {};
   if (opt.id) {
     var x = store.get('log', opt.id);
     if (!x) return;
-    LF = { id: x.id, isNew: false, original: Object.assign({}, x), v: Object.assign({}, x, { timestamp: dateKey(x.timestamp) }), urls: splitList(x.photoUrls), ids: splitList(x.photoIds), pend: (pendingPhotos[x.id] || []).slice(), drafts: [], removed: [] };
+    LF = { id: x.id, isNew: false, original: Object.assign({}, x), v: Object.assign({}, x, { timestamp: dateKey(x.timestamp) }), tags: tagsOf('log', x), urls: splitList(x.photoUrls), ids: splitList(x.photoIds), pend: (pendingPhotos[x.id] || []).slice(), drafts: [], removed: [] };
   } else {
     var d = opt.preset ? null : readDraft();
-    LF = { id: store.newId('log'), isNew: true, v: Object.assign({ title: '', timestamp: nowStamp(), category: prefs().lastCat || 'グルメ', subCategory: '', rating: 0, s1: null, s2: null, s3: null, s4: null, s5: null, price: '', memo: '', author: myName(), address: '', lat: null, lng: null }, (d && d.v) || opt.preset || {}), urls: [], ids: [], pend: [], drafts: (d && d.drafts) || opt.photos || [], removed: [], wishId: (d && d.wishId) || opt.wishId || '', ownsDraft: !opt.preset || !readDraft() };
+    LF = { id: store.newId('log'), isNew: true, v: Object.assign({ title: '', timestamp: nowStamp(), category: prefs().lastCat || 'グルメ', subCategory: '', rating: 0, s1: null, s2: null, s3: null, s4: null, s5: null, price: '', memo: '', author: myName(), address: '', lat: null, lng: null }, (d && d.v) || opt.preset || {}), urls: [], ids: [], pend: [], drafts: (d && d.drafts) || opt.photos || [], removed: [], tags: (d && d.tags) || (opt.preset && opt.preset.tagList) || [], noteKey: (d && d.noteKey) || opt.noteKey || '', ownsDraft: !opt.preset || !readDraft() };
+    delete LF.v.tagList;
     if (d) toast('書きかけの続きです');
   }
-  openSheet(LF.isNew ? '記録を追加' : '記録を編集', '<form data-submit="log" class="form" id="logForm"></form>', { onClose: function() { saveDraft(); LF = null; } });
+  openSheet(LF.isNew ? '追加' : '記録を編集', '<form data-submit="log" class="form" id="logForm"></form>', { onClose: function() { saveDraft(); LF = null; } });
   drawLogForm();
 }
 
 function formPhotos() { return LF.urls.map(function(u) { return { kind: 'urls', key: u, p: { url: u } }; }).concat(LF.ids.map(function(i) { return { kind: 'ids', key: i, p: { id: i } }; }), LF.pend.map(function(i) { return { kind: 'pend', key: i, p: { id: i } }; }), LF.drafts.map(function(i) { return { kind: 'drafts', key: i, p: { id: i } }; })); }
 
+// 評価の目安（全カテゴリ共通）
+var RATE_GUIDE = [[5, '感動・殿堂入り', '誰にでも自信をもってお勧めできる。絶対にリピートしたい。'], [4, '大満足・おすすめ', '期待以上。良い点が多く、また行きたい・購入したい。'], [3, '普通・満足', '納得感あり。機会があれば再訪・再購入。'], [2, '物足りない・惜しい', '気になるデメリット、不満点があった。'], [1, '残念・おすすめしない', '全体的に満足度が低く、再訪・再購入はしない。']];
+function scoreDots(k) { var s = Number(LF.v[k]) || 0; return '<span class="dots">' + [1, 2, 3, 4, 5].map(function(n) { return '<button type="button" class="' + (n <= s ? 'on' : '') + '" data-act="lfScore" data-k="' + k + '" data-v="' + n + '" aria-label="' + n + '" aria-pressed="' + (n === s) + '">' + n + '</button>'; }).join('') + '</span>'; }
+function lfSummary() { return [dateLabel(LF.v.timestamp) + ' ' + String(LF.v.timestamp).slice(11, 16), LF.v.author, LF.v.address].filter(Boolean).join('・'); }
+// 追加の画面の上部: ログとメモの切り替え
+function addSwitch(cur) { return '<div class="seg">' + [['log', 'ログ'], ['memo', 'メモ・気になる']].map(function(t) { return '<button type="button" class="' + (cur === t[0] ? 'on' : '') + '" data-act="addSwitch" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>'; }
+ACT.addSwitch = function(el) {
+  if (el.classList.contains('on')) return;
+  var toLog = el.dataset.v === 'log', f = el.closest('form').elements, title = f.title.value, text = toLog ? [f.body.value, f.url.value].filter(Boolean).join('\n') : f.memo.value;
+  commitTagInput();
+  var tags = TP.list.slice();
+  if (!toLog && LF) { var drop = LF.drafts.length; if (drop) { toast('写真があるため、ログのまま記録してください'); return; } clearDraft(); LF.isNew = false; }
+  closeSheet();
+  if (toLog) openLogForm({ preset: { title: title, memo: text, tagList: tags.filter(function(t) { return t !== WANT_TAG; }) } });
+  else noteForm(null, { title: title, body: text, tags: tags });
+};
+
 function drawLogForm() {
-  var v = LF.v, c = catOf(v.category), ph = formPhotos();
-  $('logForm').innerHTML =
-    '<label><span>タイトル・店名・作品名</span><input name="title" value="' + esc(v.title) + '" data-input="lf" required autocomplete="off"></label>' +
-    '<div><span class="lbl">大分類</span><div class="chips wrap">' + Object.keys(cats()).concat(v.category && !cats()[v.category] ? [v.category] : []).map(function(k) { return '<button type="button" class="chip ' + (k === v.category ? 'on' : '') + '" data-act="lfCat" data-v="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div></div>' +
-    '<label class="half"><span>中分類</span><select name="subCategory" data-change="lf">' + options([['', '選択なし']].concat(c.sub), v.subCategory) + '</select></label>' +
-    '<label class="half"><span>日時</span><input type="datetime-local" name="timestamp" value="' + esc(normDate(v.timestamp).replace(' ', 'T').slice(0, 16)) + '" data-input="lf"></label>' +
-    '<div><span class="lbl">総合評価（もう一度押すと未評価）</span><div class="rate">' + [1, 2, 3, 4, 5].map(function(n) { return '<button type="button" class="' + (n <= (v.rating || 0) ? 'on' : '') + '" data-act="lfRate" data-v="' + n + '" aria-label="評価 ' + n + '">★</button>'; }).join('') + '</div></div>' +
-    (c.scores.length ? '<div><span class="lbl">項目別（0 は未評価）</span>' + c.scores.map(function(t, i) { var s = v['s' + (i + 1)] || 0; return '<label class="score">' + esc(t) + '<input type="range" min="0" max="5" step="1" name="s' + (i + 1) + '" value="' + s + '" data-input="lf"><b>' + (s || '-') + '</b></label>'; }).join('') + '</div>' : '') +
-    (c.prices.length ? '<label class="half"><span>' + (v.category === 'レシピ' ? '時間' : '価格帯') + '</span><select name="price" data-change="lf">' + options([['', '選択なし']].concat(c.prices), v.price) + '</select></label>' : '') +
-    '<label class="half"><span>投稿者</span><select name="author" data-change="lf">' + options(names(), v.author) + '</select></label>' +
-    '<div><span class="lbl">写真（位置情報は取り除いて保存します）</span><div class="fphotos">' + ph.map(function(f, i) { return '<div>' + photoTag(f.p, 'thumb') + '<button type="button" class="n" data-act="lfMark" data-n="' + (i + 1) + '" aria-label="本文に写真' + (i + 1) + 'を入れる">写真' + (i + 1) + '</button><button type="button" class="x" data-act="lfDel" data-kind="' + f.kind + '" data-key="' + esc(f.key) + '" aria-label="写真を外す">' + icon('close') + '</button></div>'; }).join('') + '<label>' + icon('camera') + '<input type="file" accept="image/*" multiple data-change="lfFile" aria-label="写真を選ぶ"></label></div></div>' +
-    '<div><span class="lbl">場所</span><div class="row"><input name="address" value="' + esc(v.address) + '" data-input="lf" placeholder="住所・場所"><button type="button" class="btn small" data-act="lfGeo">調べる</button></div><div id="lfGps">' + gpsHint() + '</div></div>' +
-    '<label><span>感想・メモ</span><textarea name="memo" rows="6" data-input="lf">' + esc(v.memo) + '</textarea></label>' +
-    '<div class="chips wrap" id="lfTags">' + (v.category === 'レシピ' ? '<button type="button" class="chip" data-act="lfRecipe">レシピのひな形</button>' : '') + tagChips() + '</div>' +
-    '<div class="form-foot">' + (LF.isNew ? '<button type="button" class="btn danger" data-act="lfDiscard">書きかけを消す</button>' : '') + '<button type="submit" class="btn primary">' + (LF.isNew ? '記録する' : '保存') + '</button></div>';
+  var v = LF.v, c = catOf(v.category), ph = formPhotos(), sec = function(t, body, note) { return '<section class="fs"><h3>' + t + (note ? '<small>' + note + '</small>' : '') + '</h3>' + body + '</section>'; };
+  $('logForm').innerHTML = (LF.isNew ? addSwitch('log') : '') +
+    sec('タイトル', '<input name="title" value="' + esc(v.title) + '" data-input="lf" required autocomplete="off" placeholder="店名・場所・作品名・出来事" aria-label="タイトル">') +
+    sec('分類', '<div class="chips wrap">' + Object.keys(cats()).concat(v.category && !cats()[v.category] ? [v.category] : []).map(function(k) { return '<button type="button" class="chip ' + (k === v.category ? 'on' : '') + '" data-act="lfCat" data-v="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div><div class="two"><select name="subCategory" data-change="lf" aria-label="中分類">' + options([['', '中分類']].concat(c.sub), v.subCategory) + '</select>' + (c.prices.length ? '<select name="price" data-change="lf" aria-label="価格帯・時間">' + options([['', v.category === 'レシピ' ? '所要時間' : '価格帯']].concat(c.prices), v.price) + '</select>' : '') + '</div>') +
+    sec('総合評価', '<div class="guide">' + RATE_GUIDE.map(function(g) { var on = (v.rating || 0) === g[0]; return '<button type="button" class="' + (on ? 'on' : '') + '" data-act="lfRate" data-v="' + g[0] + '" aria-pressed="' + on + '"><span class="st">' + '★'.repeat(g[0]) + '</span><span class="grow"><b>' + g[1] + '</b><span class="muted blk">' + g[2] + '</span></span></button>'; }).join('') + '</div>', 'もう一度押すと未評価') +
+    (c.scores.length ? sec('項目別の評価', '<div class="scores">' + c.scores.map(function(t, i) { return '<div><span>' + esc(t) + '</span>' + scoreDots('s' + (i + 1)) + '</div>'; }).join('') + '</div>', '任意') : '') +
+    sec('写真', '<div class="fphotos">' + ph.map(function(f, i) { return '<div>' + photoTag(f.p, 'thumb') + '<button type="button" class="n" data-act="lfMark" data-n="' + (i + 1) + '" aria-label="本文に写真' + (i + 1) + 'を入れる">写真' + (i + 1) + '</button><button type="button" class="x" data-act="lfDel" data-kind="' + f.kind + '" data-key="' + esc(f.key) + '" aria-label="写真を外す">' + icon('close') + '</button></div>'; }).join('') + '<label>' + icon('camera') + '<input type="file" accept="image/*" multiple data-change="lfFile" aria-label="写真を選ぶ"></label></div><div id="lfGps">' + gpsHint() + '</div>', '位置情報は取り除いて保存') +
+    sec('感想・メモ', '<textarea name="memo" rows="5" data-input="lf" aria-label="感想・メモ">' + esc(v.memo) + '</textarea>' + (v.category === 'レシピ' ? '<button type="button" class="btn small" data-act="lfRecipe">レシピのひな形</button>' : '')) +
+    sec('タグ', tagBox({ list: LF.tags, skip: [WANT_TAG, v.category], weight: function(type, x) { return type === 'log' ? (x.category === v.category ? 5 : 1) : 0.3; }, on: function() { LF.tags = TP.list; saveDraft(); } }), '押すだけで付きます') +
+    '<section class="fs"><button type="button" class="moreh" data-act="lfMore" aria-expanded="' + !!LF.more + '"><h3>日時・場所・投稿者</h3><span class="muted ell" id="lfSum">' + esc(lfSummary()) + '</span>' + icon(LF.more ? 'up' : 'down') + '</button>' + (LF.more ? '<div class="two"><input type="datetime-local" name="timestamp" value="' + esc(normDate(v.timestamp).replace(' ', 'T').slice(0, 16)) + '" data-input="lf" aria-label="日時"><select name="author" data-change="lf" aria-label="投稿者">' + options(names(), v.author) + '</select></div><div class="row"><input name="address" value="' + esc(v.address) + '" data-input="lf" placeholder="住所・場所（空ならタイトルで調べます）" aria-label="場所"><button type="button" class="btn small" data-act="lfGeo">調べる</button></div>' : '') + '</section>' +
+    '<div class="form-foot stick">' + (LF.isNew ? '<button type="button" class="btn danger" data-act="lfDiscard">消す</button>' : '') + '<button type="submit" class="btn primary">' + (LF.isNew ? '記録する' : '保存') + '</button></div>';
+  drawTags();
   watchPhotos($('logForm'));
-}
-function tagChips() {
-  var m = String(LF.v.memo || ''), typing = (m.match(/#([^\s#]*)$/) || [])[1], has = extractTags(m).map(function(t) { return t.toLowerCase(); });
-  return allTags().filter(function(t) { return typing ? t.tag.slice(1).toLowerCase().indexOf(typing.toLowerCase()) >= 0 : has.indexOf(t.tag.toLowerCase()) < 0; }).slice(0, 8).map(function(t) { return '<button type="button" class="chip" data-act="lfTag" data-tag="' + esc(t.tag) + '">' + esc(t.tag) + '</button>'; }).join('');
 }
 function gpsHint() {
   return LF.gps ? '<button type="button" class="chip" data-act="lfGps" style="margin-top:6px">写真の撮影場所を使う' + (LF.gps.address ? '：' + esc(LF.gps.address) : '') + '</button>' : LF.v.lat ? '<span class="muted">位置あり</span>' : '';
@@ -1066,15 +1138,16 @@ function gpsHint() {
 
 INPUT.lf = function(el) {
   var k = el.name, val = el.value;
-  if (/^s\d$/.test(k)) { LF.v[k] = Number(val) || null; el.nextElementSibling.textContent = Number(val) || '-'; }
-  else if (k === 'timestamp') LF.v[k] = normDate(val).slice(0, 16);
+  if (k === 'timestamp') LF.v[k] = normDate(val).slice(0, 16);
   else LF.v[k] = val;
+  var sum = $('lfSum'); if (sum) sum.textContent = lfSummary();
   if (k === 'address') { LF.v.lat = LF.v.lng = null; $('lfGps').innerHTML = gpsHint(); } // 住所を書き換えたら、古い位置は使わない
-  if (k === 'memo') { var t = $('lfTags'); t.innerHTML = (LF.v.category === 'レシピ' ? '<button type="button" class="chip" data-act="lfRecipe">レシピのひな形</button>' : '') + tagChips(); }
   saveDraft();
 };
 ACT.lfCat = function(el) { LF.v.category = el.dataset.v; if (catOf(el.dataset.v).sub.indexOf(LF.v.subCategory) < 0) LF.v.subCategory = ''; if (catOf(el.dataset.v).prices.indexOf(LF.v.price) < 0) LF.v.price = ''; saveDraft(); drawLogForm(); };
-ACT.lfRate = function(el) { var n = Number(el.dataset.v); LF.v.rating = LF.v.rating === n ? 0 : n; document.querySelectorAll('#logForm .rate button').forEach(function(b, i) { b.classList.toggle('on', i < LF.v.rating); }); saveDraft(); };
+ACT.lfRate = function(el) { var n = Number(el.dataset.v); LF.v.rating = LF.v.rating === n ? 0 : n; document.querySelectorAll('#logForm .guide button').forEach(function(b) { var on = Number(b.dataset.v) === LF.v.rating; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); saveDraft(); };
+ACT.lfScore = function(el) { var k = el.dataset.k, n = Number(el.dataset.v); LF.v[k] = LF.v[k] === n ? null : n; el.parentNode.outerHTML = scoreDots(k); saveDraft(); };
+ACT.lfMore = function() { LF.more = !LF.more; drawLogForm(); };
 function insertMemo(text, replace) {
   var ta = $('logForm').elements.memo, s = ta.selectionStart === undefined ? ta.value.length : ta.selectionStart, before = ta.value.slice(0, s), after = ta.value.slice(s);
   if (replace) before = before.replace(replace, '');
@@ -1082,7 +1155,6 @@ function insertMemo(text, replace) {
   ta.focus(); ta.setSelectionRange((before + text).length, (before + text).length);
   INPUT.lf(ta);
 }
-ACT.lfTag = function(el) { var v = LF.v.memo || ''; insertMemo((v && !/[\s#]$/.test(v) && !/#[^\s#]*$/.test(v) ? ' ' : '') + el.dataset.tag + ' ', /#[^\s#]*$/); };
 ACT.lfRecipe = function() { insertMemo((LF.v.memo ? '\n\n' : '') + RECIPE); };
 ACT.lfMark = function(el) { insertMemo('[写真' + el.dataset.n + ']\n'); };
 // 写真を外す。保存するまでは端末からも消さない（未保存の新しい写真だけは消す）
@@ -1112,7 +1184,7 @@ ACT.lfGeo = function(el) {
   callApi('geocode', { query: q }).then(function(g) {
     if (LF !== me) return;
     if (!g.found) { toast('場所が見つかりません'); return; }
-    LF.v.address = g.address; LF.v.lat = g.lat; LF.v.lng = g.lng; saveDraft(); drawLogForm();
+    LF.v.address = g.address; LF.v.lat = g.lat; LF.v.lng = g.lng; saveDraft(); drawLogForm(); toast('場所を入れました');
   }).catch(function(e) { toast(e.message); }).then(function() { el.disabled = false; });
 };
 ACT.lfDiscard = function() {
@@ -1124,10 +1196,12 @@ ACT.lfDiscard = function() {
 };
 
 SUBMIT.log = function() {
+  commitTagInput();
   var f = LF, v = f.v, val = {};
   if (!String(v.title || '').trim()) { toast('タイトルを入力してください'); return; }
   ['title', 'timestamp', 'category', 'subCategory', 'rating', 's1', 's2', 's3', 's4', 's5', 'price', 'memo', 'author', 'address', 'lat', 'lng'].forEach(function(k) { val[k] = v[k]; });
   val.title = val.title.trim();
+  val.tags = tagsValue('log', val, f.tags.concat(writtenTags('log', f.original, val)));
   if (!catOf(val.category).scores.length) val.s1 = val.s2 = val.s3 = val.s4 = val.s5 = null;
   if (!f.isNew && dateKey(f.original.timestamp) === val.timestamp) val.timestamp = f.original.timestamp;
   if (!f.isNew) {
@@ -1145,16 +1219,17 @@ SUBMIT.log = function() {
   // 編集中に送信が済んでいた写真を外した場合
   var sent = f.removed.filter(function(x) { return x.kind === 'pend'; }).map(function(x) { return x.key; }), now = splitList((store.get('log', f.id) || {}).photoIds);
   if (now.some(function(i) { return sent.indexOf(i) >= 0; })) store.patch('log', f.id, { photoIds: now.filter(function(i) { return sent.indexOf(i) < 0; }).join(',') });
-  if (f.wishId) store.patch('wish', f.wishId, { status: '訪問済' });
+  var note = f.noteKey && noteByKey(f.noteKey);
+  if (note) setNoteDone(note, true);
   f.isNew = false;
   clearDraft(); closeSheet();
   toast('保存しました');
 };
 
 // ============================================================
-// Mod_Plan : 目標・連休・月のまとめ / 気になる / やりたいこと100
+// Mod_Plan : 目標・連休・月のまとめ / やりたいこと100（「気になる」はメモに統合）
 // ============================================================
-var PV = { sub: 'dash', date: new Date(), wStatus: 'active', wCat: '', wAuthor: '', bSort: 'num', bCat: '', bStatus: 'all' };
+var PV = { sub: 'dash', date: new Date(), bSort: 'num', bCat: '', bStatus: 'all' };
 
 function pairLikes(type, x) {
   var me = store.st.server.me;
@@ -1173,8 +1248,8 @@ ACT.like = function(el) {
 };
 
 RENDER.plan = function() {
-  $('main').innerHTML = '<div class="seg">' + [['dash', '目標・連休'], ['wish', '気になる'], ['bucket', 'やりたいこと']].map(function(t) { return '<button type="button" class="' + (PV.sub === t[0] ? 'on' : '') + '" data-act="planSub" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="planBox"></div>';
-  $('planBox').innerHTML = PV.sub === 'dash' ? planDash() : PV.sub === 'wish' ? planWish() : planBucket();
+  $('main').innerHTML = '<div class="seg">' + [['dash', '目標・連休'], ['bucket', 'やりたいこと100']].map(function(t) { return '<button type="button" class="' + (PV.sub === t[0] ? 'on' : '') + '" data-act="planSub" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="planBox"></div>';
+  $('planBox').innerHTML = PV.sub === 'dash' ? planDash() : planBucket();
 };
 ACT.planSub = function(el) { PV.sub = el.dataset.v; RENDER.plan(); };
 INPUT.planF = function(el) { PV[el.dataset.k] = el.value; RENDER.plan(); };
@@ -1230,39 +1305,6 @@ ACT.holEdit = function(el) {
     } });
 };
 
-// ---- 気になる ----
-function planWish() {
-  var l = store.list('wish').filter(function(w) {
-    if (PV.wStatus === 'active' && isVisited(w.status)) return false;
-    if (PV.wStatus === 'both' && (isVisited(w.status) || !isLiked(w.like1) || !isLiked(w.like2))) return false;
-    return (!PV.wCat || w.category === PV.wCat) && (!PV.wAuthor || w.author === PV.wAuthor);
-  }).sort(function(a, b) { return String(b.regDate).localeCompare(String(a.regDate)); });
-  return '<div class="filters"><select data-change="planF" data-k="wStatus" aria-label="状態">' + options([['active', '未訪問'], ['both', '両方いいね'], ['all', '訪問済も含む']], PV.wStatus) + '</select><select data-change="planF" data-k="wCat" aria-label="大分類">' + options([['', '大分類']].concat(Object.keys(cats())), PV.wCat) + '</select><select data-change="planF" data-k="wAuthor" aria-label="登録者">' + options([['', '登録者']].concat(names()), PV.wAuthor) + '</select><button type="button" class="btn small" data-act="wishEdit">追加</button></div>' +
-    (l.map(function(w) {
-      return '<div class="card"><div class="row between"><span class="muted ell">' + esc(w.category) + (w.subCategory ? ' / ' + esc(w.subCategory) : '') + '・' + esc(w.author) + '</span>' + (isLiked(w.like1) && isLiked(w.like2) ? '<span class="pill red">両方いいね</span>' : '') + (isVisited(w.status) ? '<span class="pill green">訪問済</span>' : '') + '</div><h3 class="tap" data-act="wishEdit" data-id="' + esc(w.id) + '">' + esc(w.title) + '</h3>' + (w.memo ? '<div class="text clamp">' + richText(w.memo) + '</div>' : '') + (safeUrl(w.url) ? '<a class="muted" href="' + esc(safeUrl(w.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(domainOf(w.url)) + '</a>' : '') + '<div class="row" style="margin-top:6px;flex-wrap:wrap">' + pairLikes('wish', w) + (isVisited(w.status) ? '' : '<button type="button" class="btn small" data-act="wishLog" data-id="' + esc(w.id) + '">訪問した</button>') + '</div></div>';
-    }).join('') || '<div class="empty">当てはまるものがありません</div>');
-}
-function wishForm(w, preset) {
-  var v = w || Object.assign({ type: 'お店・スポット', category: 'グルメ', author: myName(), status: '気になる' }, preset || {});
-  var el = openForm({ title: w ? '気になるを編集' : '気になるを追加', values: v, fields: [{ k: 'title', label: 'タイトル', required: true }, { k: 'category', label: '大分類', type: 'select', options: Object.keys(cats()), half: true, change: 'wishCat' }, { k: 'subCategory', label: '中分類', type: 'select', options: [['', '選択なし']].concat(catOf(v.category).sub), half: true }, { k: 'url', label: '参考URL', type: 'text' }, { k: 'author', label: '登録者', type: 'select', options: names(), half: true }, { k: 'status', label: '状態', type: 'select', options: ['気になる', '訪問済'], half: true }, { k: 'memo', label: 'メモ', type: 'textarea' }],
-    onDelete: w ? function() { trashItem('wish', w.id, '気になる'); } : null, onSave: function(val) {
-      if (w) saveEdited('wish', w, val); else {
-        var me = store.st.server.me; val.type = v.type; val.regDate = ymd(new Date());
-        if (me) val['like' + me.n] = 'true';
-        store.add('wish', val);
-      }
-      toast('保存しました');
-    } });
-  return el;
-}
-INPUT.wishCat = function(el) { el.form.elements.subCategory.innerHTML = options([['', '選択なし']].concat(catOf(el.value).sub), ''); };
-ACT.wishEdit = function(el) { wishForm(el.dataset.id ? store.get('wish', el.dataset.id) : null); };
-// 「訪問済」にするのは、ログを保存できたとき（途中でやめても状態が変わらない）
-ACT.wishLog = function(el) {
-  var w = store.get('wish', el.dataset.id);
-  go('log');
-  openLogForm({ preset: { title: w.title, category: cats()[w.category] ? w.category : 'グルメ', subCategory: w.subCategory || '', memo: [w.memo, w.url].filter(Boolean).join('\n') }, wishId: w.id });
-};
 
 // ---- やりたいこと100 ----
 function planBucket() {
@@ -1293,49 +1335,123 @@ ACT.bucketEdit = function(el) {
 };
 
 // ============================================================
-// Mod_Memo : ナレッジ・Web クリップ
+// Mod_Memo : メモ（旧「メモ・ナレッジ」と旧「気になるリスト」を 1 つの一覧で扱い、タグで分ける）
+// シートは元のまま 2 枚。新しいものは「メモ・ナレッジ」に入れる
 // ============================================================
-var MV = { q: '', cat: '', author: '', pin: false, shown: 40 };
+var MV = { q: '', tag: '', seg: 'all', both: false, pin: false, shown: 40, open: {} };
+
+// 2 つのシートの行を同じ形にそろえる
+function noteOf(type, x) {
+  return { type: type, id: x.id, key: type + ':' + x.id, x: x, title: x.title, body: type === 'memo' ? x.content : x.memo, url: x.url, tags: tagsOf(type, x), due: x.due || '', like1: x.like1, like2: x.like2, pinned: !!x.pinned, author: x.author, done: type === 'memo' ? x.state === '完了' : isVisited(x.status), date: dateKey(type === 'memo' ? x.editedAt || x.createdAt : x.regDate), _pending: x._pending };
+}
+function notes() { return store.list('memo').map(function(x) { return noteOf('memo', x); }).concat(store.list('wish').map(function(x) { return noteOf('wish', x); })); }
+function noteByKey(key) { var p = String(key).split(':'), x = store.get(p[0], p[1]); return x && (p[0] === 'memo' || p[0] === 'wish') ? noteOf(p[0], x) : null; }
+function setNoteDone(n, on) { store.patch(n.type, n.id, n.type === 'memo' ? { state: on ? '完了' : '' } : { status: on ? '訪問済' : '気になる' }); }
+
+// 期限（イベントの終了日など）。当日は終わっていない
+function dueInfo(due, now) {
+  var d = toDate(due);
+  if (!d) return null;
+  var t = now || new Date(), days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(t.getFullYear(), t.getMonth(), t.getDate())) / 864e5);
+  return { days: days, cls: days < 0 ? 'over' : days <= 7 ? 'soon' : '', label: days < 0 ? '終了（' + (d.getMonth() + 1) + '/' + d.getDate() + '）' : days === 0 ? '今日まで' : days === 1 ? '明日まで' : days <= 14 ? 'あと' + days + '日（' + (d.getMonth() + 1) + '/' + d.getDate() + '）' : (d.getFullYear() === t.getFullYear() ? '' : d.getFullYear() + '/') + (d.getMonth() + 1) + '/' + d.getDate() + 'まで' };
+}
+function filteredNotes() {
+  var l = notes().filter(function(n) {
+    if (MV.seg === 'done' ? !n.done : n.done) return false;
+    if (MV.seg === 'want' && !hasTag(n.tags, WANT_TAG)) return false;
+    if (MV.seg === 'due' && !n.due) return false;
+    if (MV.both && !(isLiked(n.like1) && isLiked(n.like2))) return false;
+    if (MV.pin && !n.pinned) return false;
+    if (MV.tag && !hasTag(n.tags, MV.tag)) return false;
+    return !MV.q || matches([n.title, n.body, n.url, n.author, n.tags.join(' ')].join(' '), MV.q);
+  });
+  var rank = function(n) { var d = dueInfo(n.due); return d && d.days >= 0 && d.days <= 14 ? d.days : 99; };
+  return l.sort(function(a, b) {
+    if (MV.seg === 'due') { var x = dueInfo(a.due), y = dueInfo(b.due); return (x.days < 0) - (y.days < 0) || x.days - y.days; }
+    return b.pinned - a.pinned || rank(a) - rank(b) || b.date.localeCompare(a.date);
+  });
+}
 
 RENDER.memo = function() {
-  var n = {};
-  store.list('memo').forEach(function(m) { extractTags(m.title + '\n' + m.content).forEach(function(t) { n[t] = (n[t] || 0) + 1; }); });
-  $('main').innerHTML = '<div class="row"><input type="search" class="grow" placeholder="メモを検索・#タグ" value="' + esc(MV.q) + '" data-input="memoQ" aria-label="メモを検索"><button type="button" class="btn" data-act="memoEdit">追加</button></div><div class="filters"><select data-change="memoF" data-k="cat" aria-label="カテゴリ">' + options([['', '全カテゴリ']].concat(MEMO_CATS), MV.cat) + '</select><select data-change="memoF" data-k="author" aria-label="投稿者">' + options([['', '全投稿者']].concat(names()), MV.author) + '</select></div><div class="chips" style="margin-bottom:8px"><button type="button" class="chip ' + (MV.pin ? 'on' : '') + '" data-act="memoPinF">ピン留め</button>' + Object.keys(n).sort(function(a, b) { return n[b] - n[a]; }).slice(0, 12).map(function(t) { return '<button type="button" class="chip ' + (MV.q === t ? 'on' : '') + '" data-act="tag" data-tag="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div><div id="memoList"></div>';
+  var all = notes().filter(function(n) { return !n.done; }), cnt = {}, tags;
+  all.forEach(function(n) { n.tags.forEach(function(t) { cnt[t] = (cnt[t] || 0) + 1; }); });
+  tags = Object.keys(cnt).filter(function(t) { return t !== WANT_TAG; }).sort(function(a, b) { return cnt[b] - cnt[a]; }).slice(0, 14);
+  if (MV.tag && !hasTag(tags, MV.tag)) tags.unshift(MV.tag);
+  $('main').innerHTML = '<div class="row"><input type="search" class="grow" placeholder="メモを検索" value="' + esc(MV.q) + '" data-input="memoQ" aria-label="メモを検索"><button type="button" class="btn" data-act="noteAdd">追加</button></div>' +
+    '<div class="seg" style="margin-top:8px">' + [['all', 'すべて'], ['want', WANT_TAG], ['due', '期限あり'], ['done', '済み']].map(function(t) { return '<button type="button" class="' + (MV.seg === t[0] ? 'on' : '') + '" data-act="noteSeg" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="chips tagrow"><button type="button" class="chip ' + (MV.pin ? 'on' : '') + '" data-act="notePinF">ピン留め</button><button type="button" class="chip ' + (MV.both ? 'on' : '') + '" data-act="noteBoth">両方いいね</button>' + tags.map(function(t) { return '<button type="button" class="chip ' + (MV.tag && sameTag(MV.tag, t) ? 'on' : '') + '" data-act="tag" data-tag="#' + esc(t) + '">#' + esc(t) + '<small>' + (cnt[t] || 0) + '</small></button>'; }).join('') + '</div><div id="memoList"></div>';
   RENDER.memoList();
 };
 RENDER.memoList = function() {
-  var l = store.list('memo').filter(function(m) {
-    return (!MV.cat || m.category === MV.cat) && (!MV.author || m.author === MV.author) && (!MV.pin || m.pinned) && (!MV.q || matches([m.title, m.content, m.url, m.category, m.author].join(' '), MV.q));
-  }).sort(function(a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || dateKey(b.editedAt || b.createdAt).localeCompare(dateKey(a.editedAt || a.createdAt)); });
-  $('memoList').innerHTML = l.slice(0, MV.shown).map(function(m) {
-    var id = esc(m.id);
-    return '<article class="card"><div class="row between"><span class="muted ell">' + esc(m.category) + '・' + esc(m.author) + '・' + esc(String(m.editedAt || m.createdAt || '').slice(0, 10)) + '</span><button type="button" class="icon-btn" data-act="memoPin" data-id="' + id + '" aria-label="ピン留め" aria-pressed="' + !!m.pinned + '" style="color:' + (m.pinned ? 'var(--gold-d)' : 'var(--line2)') + '">' + icon('pin') + '</button></div><h3 class="tap" data-act="memoEdit" data-id="' + id + '">' + esc(m.title || domainOf(m.url) || '無題') + '</h3>' + (m.content ? '<div class="text clamp">' + richText(m.content) + '</div>' : '') + (safeUrl(m.url) ? '<a class="muted" href="' + esc(safeUrl(m.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(domainOf(m.url)) + '</a>' : '') + '<div class="row" style="margin-top:8px"><button type="button" class="btn small" data-act="memoWish" data-id="' + id + '">気になるへ</button><button type="button" class="btn small" data-act="memoLog" data-id="' + id + '">ログへ</button></div></article>';
-  }).join('') + (l.length > MV.shown ? '<button type="button" class="btn more" data-act="memoMore">もっと見る</button>' : '') || '<div class="empty">メモがありません</div>';
+  var l = filteredNotes();
+  $('memoList').innerHTML = l.slice(0, MV.shown).map(function(n) {
+    var k = esc(n.key), d = dueInfo(n.due), want = hasTag(n.tags, WANT_TAG);
+    return '<article class="card note' + (n.done ? ' is-done' : '') + '"><div class="row between"><div class="grow muted ell">' + esc(n.author) + (n.date ? '・' + esc(n.date.slice(0, 10)) : '') + (n._pending ? '・未送信' : '') + '</div>' + (d ? '<span class="pill due ' + d.cls + '">' + icon('clock') + esc(d.label) + '</span>' : '') + '<button type="button" class="pinbtn ' + (n.pinned ? 'on' : '') + '" data-act="notePin" data-key="' + k + '" aria-label="ピン留め" aria-pressed="' + n.pinned + '">' + icon('pin') + '</button></div>' +
+      '<h3 class="tap" data-act="noteEdit" data-key="' + k + '">' + esc(n.title || domainOf(n.url) || '無題') + '</h3>' + longText(n.body, [], 'note:' + n.key, 3) +
+      (safeUrl(n.url) ? '<a class="link ell blk" href="' + esc(safeUrl(n.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(domainOf(n.url)) + '</a>' : '') + (n.tags.length ? '<div class="taglist">' + tagButtons(n.tags) + '</div>' : '') +
+      '<div class="row acts">' + (want ? pairLikes(n.type, n.x) : '') + '<button type="button" class="btn small" data-act="noteLog" data-key="' + k + '">ログに書く</button><button type="button" class="btn small" data-act="noteDone" data-key="' + k + '">' + (n.done ? '戻す' : want ? '訪問した' : '済み') + '</button></div></article>';
+  }).join('') + (l.length > MV.shown ? '<button type="button" class="btn more" data-act="memoMore">もっと見る（残り ' + (l.length - MV.shown) + '）</button>' : '') || '<div class="empty">当てはまるメモがありません</div>';
+  checkLong($('memoList'));
 };
-INPUT.memoQ = function(el) { MV.q = el.value.trim(); RENDER.memoList(); };
-INPUT.memoF = function(el) { MV[el.dataset.k] = el.value; RENDER.memo(); };
-ACT.memoPinF = function() { MV.pin = !MV.pin; RENDER.memo(); };
-ACT.memoMore = function() { MV.shown += 40; RENDER.memoList(); };
-ACT.memoPin = function(el) { var m = store.get('memo', el.dataset.id); store.patch('memo', m.id, { pinned: m.pinned ? '' : 'true' }); };
-ACT.memoWish = function(el) { var m = store.get('memo', el.dataset.id); wishForm(null, { title: m.title || domainOf(m.url), url: m.url, memo: m.content }); };
-ACT.memoLog = function(el) { var m = store.get('memo', el.dataset.id); openLogForm({ preset: { title: m.title || domainOf(m.url), memo: [m.content, m.url].filter(Boolean).join('\n') } }); };
-ACT.memoEdit = function(el) { memoForm(el.dataset.id ? store.get('memo', el.dataset.id) : null); };
+ACT.noteSeg = function(el) { MV.seg = el.dataset.v; MV.shown = 40; RENDER.memo(); };
+ACT.notePinF = function() { MV.pin = !MV.pin; RENDER.memo(); };
+ACT.noteBoth = function() { MV.both = !MV.both; RENDER.memo(); };
+ACT.notePin = function(el) { var n = noteByKey(el.dataset.key); store.patch(n.type, n.id, { pinned: n.pinned ? '' : 'true' }); };
+ACT.noteDone = function(el) { var n = noteByKey(el.dataset.key), on = !n.done; setNoteDone(n, on); toast(on ? '済みにしました' : '戻しました', function() { setNoteDone(n, !on); }); };
+// 「済み」になるのは、ログを保存できたとき（途中でやめても状態が変わらない）
+ACT.noteLog = function(el) {
+  var n = noteByKey(el.dataset.key), c = n.type === 'wish' && cats()[n.x.category] ? n.x.category : Object.keys(cats()).filter(function(k) { return hasTag(n.tags, k); })[0] || prefs().lastCat || 'グルメ';
+  openLogForm({ preset: { title: n.title || domainOf(n.url), category: c, subCategory: n.type === 'wish' ? n.x.subCategory || '' : '', memo: [n.body, n.url].filter(Boolean).join('\n'), tagList: n.tags.filter(function(t) { return t !== WANT_TAG && t !== c; }) }, noteKey: hasTag(n.tags, WANT_TAG) ? n.key : '' });
+};
+ACT.noteAdd = function() { noteForm(null); };
+ACT.noteEdit = function(el) { noteForm(noteByKey(el.dataset.key)); };
 
-function memoForm(m, preset) {
-  openForm({ title: m ? 'メモを編集' : 'メモを追加', values: m || Object.assign({ category: MEMO_CATS[0], author: myName() }, preset || {}), fields: [{ k: 'title', label: 'タイトル' }, { k: 'content', label: '本文（#タグ が使えます）', type: 'textarea' }, { k: 'url', label: 'URL' }, { k: 'category', label: 'カテゴリ', type: 'select', options: MEMO_CATS, half: true }, { k: 'author', label: '投稿者', type: 'select', options: names(), half: true }],
-    extra: '<button type="button" class="btn small" data-act="fetchMeta">URL から題名を取得</button>', onDelete: m ? function() { trashItem('memo', m.id, 'メモ'); } : null, onSave: function(val) {
-      if (!val.title && !val.content && !val.url) { toast('内容を入力してください'); return false; }
-      if (m) saveEdited('memo', m, val); else { val.createdAt = nowStamp(); store.add('memo', val); }
+// n: 編集するメモ / null なら追加（preset: title, body, url, tags, due）
+function noteForm(n, preset) {
+  var v = n ? { title: n.title, body: n.body, url: n.url, due: n.due, author: n.author } : Object.assign({ title: '', body: '', url: '', due: '', author: myName() }, preset || {}), x = n && n.x;
+  openForm({
+    title: n ? 'メモを編集' : '追加', values: v, saveLabel: n ? '保存' : '記録する',
+    head: n ? '' : addSwitch('memo'),
+    fields: [{ k: 'title', label: 'タイトル', ph: '気になるお店・イベント・覚えておきたいこと' }, { k: 'body', label: 'メモ', type: 'textarea' }, { k: 'url', label: 'URL', ph: 'https://' }, { k: 'due', label: '期限（イベントの終了日など）', type: 'date', half: true }, { k: 'author', label: '投稿者', type: 'select', options: names(), half: true }],
+    extra: '<div><span class="lbl">タグ</span>' + tagBox({ list: n ? n.tags.slice() : (preset && preset.tags || []).slice(), quick: [WANT_TAG], weight: function(type) { return type === 'log' ? 0.2 : 1; } }) + '</div><div class="row"><button type="button" class="btn small" data-act="notePaste">貼り付け</button><button type="button" class="btn small" data-act="fetchMeta">URL から題名を取得</button></div>',
+    onDelete: n ? function() { trashItem(n.type, n.id, 'メモ'); } : null,
+    onSave: function(val) {
+      commitTagInput();
+      if (!val.title && !val.body && !val.url) { toast('内容を入力してください'); return false; }
+      var type = n ? n.type : 'memo', out = { title: val.title, url: val.url, due: val.due, author: val.author };
+      out[type === 'memo' ? 'content' : 'memo'] = val.body;
+      if (!n) { out.createdAt = nowStamp(); out.category = safeUrl(val.url) ? 'Webクリップ' : ''; }
+      out.tags = tagsValue(type, Object.assign({}, x || {}, out), TP.list.concat(writtenTags(type, x, out)));
+      if (n) saveEdited(type, x, out);
+      else { var me = store.st.server.me; if (me && hasTag(TP.list, WANT_TAG)) out['like' + me.n] = 'true'; store.add('memo', out); }
       toast('保存しました');
-    } });
+    }
+  });
+  drawTags();
+  if (!n && !v.title) topSheet().querySelector('[name=title]').focus();
 }
+// コピーした内容を貼り付ける（iPhone は共有先になれないため）
+ACT.notePaste = function(el) {
+  var f = el.form;
+  var put = function(t) {
+    var m = String(t || '').match(/https?:\/\/\S+/), rest = String(t || '').replace(m ? m[0] : '', '').trim();
+    if (m) f.elements.url.value = m[0];
+    if (rest) { if (!f.elements.title.value && rest.length <= 60 && rest.indexOf('\n') < 0) f.elements.title.value = rest; else f.elements.body.value = [f.elements.body.value, rest].filter(Boolean).join('\n'); }
+  };
+  if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(put).catch(function() { toast('入力欄を長押しして貼り付けてください'); });
+  else toast('入力欄を長押しして貼り付けてください');
+};
+
+INPUT.memoQ = function(el) { MV.q = el.value.trim(); RENDER.memoList(); };
+ACT.memoMore = function() { MV.shown += 40; RENDER.memoList(); };
+
 // サーバー経由で題名を取る。待っている間に書き換えた欄は上書きしない
 ACT.fetchMeta = function(el) {
   var f = el.form, url = safeUrl(f.elements.url.value);
   if (!/^https:/i.test(url)) { toast('https の URL を入力してください'); return; }
   el.disabled = true;
   callApi('fetchWebMetadata', { url: url }).then(function(r) {
-    var body = f.elements.content || f.elements.memo;
+    var body = f.elements.body || f.elements.note;
     if (r.title && !f.elements.title.value) f.elements.title.value = r.title;
     if (r.description && body && !body.value) body.value = r.description;
     if (!r.title) toast('題名が見つかりません');
@@ -1345,13 +1461,12 @@ ACT.fetchMeta = function(el) {
 // ============================================================
 // Mod_Out : おでかけ（スタンプ帳・道路・記念カード・お気に入り）。ふたりで共有する
 // ============================================================
-var OV = { sub: 'stamp', cat: 'castle', region: '', status: '', q: '', shown: 40, map: null, mapOn: false };
+var OV = { sub: 'stamp', cat: 'castle', region: '', status: '', q: '', shown: 40 };
 var HYAKU = null, hyakuLoading = false;
 
 function byLine(o) { return o && o.by ? esc(o.by) + (o.updatedAt ? '・' + esc(o.updatedAt.slice(0, 10)) : '') : ''; }
 
 RENDER.out = function() {
-  if (OV.map) { OV.map.remove(); OV.map = null; }
   $('main').innerHTML = '<div class="seg">' + [['stamp', 'スタンプ'], ['road', '道路'], ['card', 'カード'], ['fav', 'お気に入り']].map(function(t) { return '<button type="button" class="' + (OV.sub === t[0] ? 'on' : '') + '" data-act="outSub" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="outBox"></div>';
   ({ stamp: outStamp, road: outRoad, card: outCard, fav: outFav })[OV.sub]();
 };
@@ -1374,7 +1489,7 @@ function stampStates() {
 function stampTitle(cat, n) { var t = ''; cat.steps.forEach(function(s, i) { if (n >= s) t = cat.ranks[Math.min(i, cat.ranks.length - 1)]; }); return t; }
 function outStamp() {
   var st = stampStates(), cat = STAMP_CATS[OV.cat], spots = STAMP_SPOTS.filter(function(s) { return s.cat === OV.cat; }), n = spots.filter(function(s) { return st[s.id]; }).length, total = Object.keys(st).length;
-  $('outBox').innerHTML = '<div class="chips" style="margin-bottom:10px">' + Object.keys(STAMP_CATS).map(function(k) { return '<button type="button" class="chip ' + (k === OV.cat ? 'on' : '') + '" data-act="stampCat" data-v="' + k + '">' + esc(STAMP_CATS[k].name) + '</button>'; }).join('') + '</div><div class="card"><div class="row between"><b>' + esc(stampTitle(cat, n) || '称号はこれから') + '</b><span class="muted">' + n + ' / ' + spots.length + '（全体 ' + total + ' / ' + STAMP_SPOTS.length + '）</span></div></div>' +
+  $('outBox').innerHTML = '<div class="chips" style="margin-bottom:10px">' + Object.keys(STAMP_CATS).map(function(k) { return '<button type="button" class="chip ' + (k === OV.cat ? 'on' : '') + '" data-act="stampCat" data-v="' + k + '">' + esc(STAMP_CATS[k].name) + '</button>'; }).join('') + '</div><div class="card"><div class="row between"><b>' + esc(stampTitle(cat, n) || '称号はこれから') + '</b><span class="muted">' + n + ' / ' + spots.length + '（全体 ' + total + ' / ' + STAMP_SPOTS.length + '）</span><button type="button" class="btn small" data-act="openMap" data-layer="stamp">地図</button></div></div>' +
     spots.map(function(s) {
       var v = st[s.id];
       return '<div class="card stamp ' + (v ? 'on' : '') + '"><button type="button" class="seal" data-act="stamp" data-id="' + s.id + '" aria-pressed="' + !!v + '" aria-label="' + esc(s.name) + ' を訪問済みにする">' + icon('check') + '</button><div class="grow"><div class="muted">' + esc(s.pref) + (v ? '・' + (v.auto ? 'ログから ' : '') + esc([v.date, v.by].filter(Boolean).join(' ')) : '') + '</div><b>' + esc(s.name) + '</b><div class="muted">' + esc(s.desc) + '</div><a class="muted" href="' + esc(mapUrl(s.name + ' ' + s.pref)) + '" target="_blank" rel="noopener noreferrer">地図</a></div></div>';
@@ -1385,6 +1500,7 @@ ACT.stamp = function(el) {
   var id = el.dataset.id, on = stampStates()[id], prev = store.col('stamp')[id], back = prev ? prev.value : null;
   store.setCol('stamp', id, on ? { off: true } : { date: ymd(new Date()) });
   toast(on ? '取り消しました' : 'スタンプを押しました', function() { store.setCol('stamp', id, back); });
+  if (MP) { drawMapCard(); drawPins(); }
 };
 
 // ---- 道路（百名道） ----
@@ -1396,14 +1512,13 @@ function loadHyaku() {
   if (HYAKU || hyakuLoading) return;
   hyakuLoading = true;
   kvGet('hyaku').catch(function() { return null; }).then(function(v) { return v || callApi('getRoadData', {}).then(function(r) { kvSet('hyaku', r.hyaku).catch(function() {}); return r.hyaku; }); })
-    .then(function(h) { HYAKU = h; }).catch(function() {}).then(function() { hyakuLoading = false; if (APP.tab !== 'out' || OV.sub !== 'road') return; if (HYAKU) RENDER.out(); else drawRoads(); });
+    .then(function(h) { HYAKU = h; }).catch(function() {}).then(function() { hyakuLoading = false; if (MP) drawPins(); if (APP.tab !== 'out' || OV.sub !== 'road') return; if (HYAKU) RENDER.out(); else drawRoads(); });
 }
 function outRoad() {
   loadHyaku();
   var regs = ['北海道', '東北', '関東', '中部', '関西', '中国', '四国', '九州'], c = store.col('road'), done = Object.keys(c).filter(function(k) { return k.indexOf('hyaku_') === 0 && c[k].value.status === 'done'; }).length;
-  $('outBox').innerHTML = '<div class="card"><div class="row between"><b>百名道 ' + done + ' / 100 走破</b></div><div class="bar" style="margin-top:8px"><i style="width:' + done + '%"></i></div></div><div class="filters"><select data-change="roadF" data-k="status" aria-label="状態">' + options([['', 'すべて'], ['done', '走破済み'], ['want', '走りたい'], ['none', '未走破']], OV.status) + '</select><select data-change="roadF" data-k="region" aria-label="地方">' + options([['', '全国']].concat(regs), OV.region) + '</select><input type="search" style="grid-column:1/-1" placeholder="番号・名前・県" value="' + esc(OV.q) + '" data-input="roadQ" aria-label="道路を検索"></div>' + '<button type="button" class="btn small" data-act="roadMap" style="margin-bottom:8px">' + (OV.mapOn ? '地図を閉じる' : '地図で見る') + '</button>' + (OV.mapOn ? '<div class="map" id="roadMap" style="margin-bottom:10px"></div><p class="muted">点は起点、点線は起点と終点を結んだ目安です（実際の道の形ではありません）。</p>' : '') + '<div id="roadList"></div>';
+  $('outBox').innerHTML = '<div class="card"><div class="row between"><b>百名道 ' + done + ' / 100 走破</b></div><div class="bar" style="margin-top:8px"><i style="width:' + done + '%"></i></div></div><div class="filters"><select data-change="roadF" data-k="status" aria-label="状態">' + options([['', 'すべて'], ['done', '走破済み'], ['want', '走りたい'], ['none', '未走破']], OV.status) + '</select><select data-change="roadF" data-k="region" aria-label="地方">' + options([['', '全国']].concat(regs), OV.region) + '</select><input type="search" style="grid-column:1/-1" placeholder="番号・名前・県" value="' + esc(OV.q) + '" data-input="roadQ" aria-label="道路を検索"></div>' + '<div class="row between" style="margin-bottom:8px"><button type="button" class="btn small" data-act="openMap" data-layer="road">地図で見る</button><span class="muted">点線は起点と終点を結ぶ目安</span></div><div id="roadList"></div>';
   drawRoads();
-  if (OV.mapOn) drawRoadMap();
 }
 function filteredRoads() {
   return roads().filter(function(r) {
@@ -1424,21 +1539,9 @@ function drawRoads() {
   var l = filteredRoads();
   box.innerHTML = (l.length ? '<div class="card list">' + l.slice(0, OV.shown).map(function(r) { var s = roadStatus(r.id); return '<div class="item tap" data-act="roadOpen" data-id="' + r.id + '">' + sign(r, s) + '<div class="grow"><div><b>' + esc(r.name) + '</b> ' + (r.rank ? '<span class="pill">' + esc(r.rank) + '</span>' : '') + '</div><div class="muted ell">' + esc(r.section) + '</div></div>' + (s ? '<span class="pill ' + (s === 'done' ? 'gold' : 'red') + '">' + (s === 'done' ? '走破済み' : '走りたい') + '</span>' : '') + '</div>'; }).join('') + '</div>' : '<div class="empty">当てはまる道路がありません</div>') + (l.length > OV.shown ? '<button type="button" class="btn more" data-act="roadMore">もっと見る（残り ' + (l.length - OV.shown) + '）</button>' : '');
 }
-function drawRoadMap() {
-  needLeaflet().then(function() {
-    if (!$('roadMap')) return;
-    OV.map = makeMap($('roadMap'), [37, 137.5], 5);
-    filteredRoads().forEach(function(r) {
-      var s = roadStatus(r.id) || 'none';
-      L.polyline([r.from, r.to], { color: s === 'done' ? '#937434' : s === 'want' ? '#9c3a43' : '#5d6778', weight: 2, dashArray: '4 5' }).addTo(OV.map);
-      L.marker(r.from, { icon: L.divIcon({ className: '', html: '<div class="mk ' + s + '"></div>', iconSize: [24, 24], iconAnchor: [12, 28] }) }).addTo(OV.map).on('click', function() { openRoad(r.id); });
-    });
-  }).catch(function(e) { toast(e.message); });
-}
 INPUT.roadF = function(el) { OV[el.dataset.k] = el.value; OV.shown = 40; RENDER.out(); };
 INPUT.roadQ = function(el) { OV.q = el.value.trim(); OV.shown = 40; drawRoads(); };
 ACT.roadMore = function() { OV.shown += 60; drawRoads(); };
-ACT.roadMap = function() { OV.mapOn = !OV.mapOn; RENDER.out(); };
 ACT.roadOpen = function(el) { openRoad(el.dataset.id); };
 function openRoad(id) {
   var r = roads().filter(function(x) { return x.id === id; })[0], o = store.col('road')[id], s = roadStatus(id), m = store.col('roadMemo')[id];
@@ -1449,7 +1552,7 @@ ACT.roadSet = function(el) {
   el.parentNode.querySelectorAll('button').forEach(function(b) { b.classList.toggle('on', b === el); });
 };
 SUBMIT.roadMemo = function(f) { var t = f.elements.text.value.trim(); store.setCol('roadMemo', f.dataset.id, t ? { text: t } : null); closeSheet(); toast('保存しました'); };
-ACT.roadLog = function(el) { var r = roads().filter(function(x) { return x.id === el.dataset.id; })[0]; closeSheet(); openLogForm({ preset: { title: r.name, category: '旅行', subCategory: 'ドライブ', memo: r.section } }); };
+ACT.roadLog = function(el) { var r = roads().filter(function(x) { return x.id === el.dataset.id; })[0]; closeSheet(); closeMap(); openLogForm({ preset: { title: r.name, category: '旅行', subCategory: 'ドライブ', memo: r.section, tagList: ['百名道'] } }); };
 
 // ---- 記念カード ----
 var CARD_TYPES = [['1', '訪問カード'], ['2', '登城・参拝印'], ['3', 'チケット'], ['4', '認定証']];
@@ -1469,9 +1572,19 @@ ACT.cardEdit = function(el) {
 };
 
 // ---- お気に入り ----
-function outFav() {
+function outFav() { $('outBox').innerHTML = favHtml(); }
+function favHtml() {
   var c = store.col('favorite'), keys = Object.keys(c).sort(function(a, b) { return String(c[a].value.title).localeCompare(String(c[b].value.title), 'ja'); });
-  $('outBox').innerHTML = '<div class="section"><h3>お気に入りサイト</h3><button type="button" class="btn small" data-act="favEdit">追加</button></div>' + (keys.length ? '<div class="card list">' + keys.map(function(k) { var f = c[k].value; return '<div class="item"><div class="grow"><a href="' + esc(safeUrl(f.url)) + '" target="_blank" rel="noopener noreferrer"><b>' + esc([f.icon, f.title || domainOf(f.url)].filter(Boolean).join(' ')) + '</b></a><div class="muted ell">' + esc(f.note || domainOf(f.url)) + '</div></div><button type="button" class="btn small" data-act="favEdit" data-key="' + esc(k) + '">編集</button></div>'; }).join('') + '</div>' : '<div class="empty">まだありません</div>');
+  return '<div class="section"><h3>お気に入りサイト</h3><button type="button" class="btn small" data-act="favEdit">追加</button></div>' + (keys.length ? '<div class="favs">' + keys.map(function(k) { var f = c[k].value; return '<div class="fav"><a href="' + esc(safeUrl(f.url)) + '" target="_blank" rel="noopener noreferrer"><span class="fi">' + esc(f.icon || (f.title || domainOf(f.url)).slice(0, 1)) + '</span><span class="grow"><b class="ell blk">' + esc(f.title || domainOf(f.url)) + '</b><span class="muted ell blk">' + esc(f.note || domainOf(f.url)) + '</span></span></a><button type="button" class="icon-btn" data-act="favEdit" data-key="' + esc(k) + '" aria-label="編集">' + icon('edit') + '</button></div>'; }).join('') + '</div>' : '<div class="empty">まだありません</div>');
+}
+// どの画面からも開けるように、上部の星から出す
+ACT.favs = function() { openSheet('お気に入り', '<div id="favBox">' + favHtml() + '</div>'); };
+// 最初から入れておくもの。外したあとに勝手に戻さない（取り消した行が残るため）
+var FAV_FIRST = { title: 'ゆる～と（全国日帰り温泉・銭湯マップ）', url: 'https://yuru-to.net/', icon: '♨', note: '全国の日帰り温泉・銭湯を地図から探せる' };
+function seedFavorite() {
+  var key = FAV_FIRST.url.replace(/\/+$/, '');
+  if (!store.st.server.me || store.st.server.col['favorite:' + key] || store.col('favorite')[key]) return;
+  store.setCol('favorite', key, FAV_FIRST);
 }
 ACT.favEdit = function(el) {
   var key = el.dataset.key, v = key ? store.col('favorite')[key].value : {};
@@ -1488,65 +1601,175 @@ ACT.favEdit = function(el) {
 };
 
 // ============================================================
+// Mod_Map : 全画面の地図（右端のボタンから左へ開くパネル・分類のアイコン・名前の表示）
+// 地図の画像は国土地理院 / OpenStreetMap から取得する（表示した範囲が伝わる）
+// ============================================================
+var MAP_BASES = {
+  std: ['標準', 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', 18], pale: ['淡色', 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', 18],
+  photo: ['写真', 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', 18], osm: ['OSM', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', 19]
+};
+var MAP_MARK = { 'グルメ': ['食', 1], 'スイーツ': ['甘', 2], 'お酒': ['酒', 3], '旅行': ['旅', 4], 'レシピ': ['膳', 5], 'エンタメ': ['遊', 6], '日記・日常': ['日', 7] };
+var MP = null;
+
+function mapPrefs() { return Object.assign({ base: 'pale', off: {}, rate: 0, names: true, log: true, stamp: false, road: false }, prefs().map || {}); }
+ACT.openMap = function(el) { openMap(el && el.dataset.layer, el && el.dataset.id); };
+function openMap(layer, id) {
+  closeAllSheets();
+  closeMap();
+  var el = document.createElement('div');
+  el.id = 'mapView';
+  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">ふたりの地図</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
+    '<div class="map-btns">' + [['base', '地図'], ['show', '表示'], ['find', '検索'], ['here', '現在地'], ['fit', '全体'], ['close', '閉じる']].map(function(b) { return '<button type="button" data-act="mapBtn" data-v="' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div><div class="map-card" id="mapCard"></div>';
+  document.body.appendChild(el);
+  document.body.classList.add('locked');
+  MP = { o: mapPrefs(), panel: '', q: '', sel: id ? 'log:' + id : '', layer: null, map: null };
+  if (layer) { MP.o.log = layer === 'log'; MP.o.stamp = layer === 'stamp'; MP.o.road = layer === 'road'; }
+  if (MP.o.road) loadHyaku();
+  needLeaflet().then(function() {
+    if (!MP || !$('mapCanvas')) return;
+    MP.map = L.map($('mapCanvas'), { zoomControl: false }).setView([36.2, 137.8], 5);
+    L.control.zoom({ position: 'bottomright' }).addTo(MP.map);
+    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(MP.map);
+    MP.layer = L.layerGroup().addTo(MP.map);
+    setMapBase();
+    MP.map.on('zoomend moveend', drawPins);
+    MP.map.on('click', function() { MP.sel = ''; mapPanel(''); drawMapCard(); drawPins(); });
+    fitMap();
+    if (MP.sel) drawMapCard();
+  }).catch(function(e) { toast(e.message); closeMap(); });
+}
+function closeMap() {
+  if (MP && MP.map) MP.map.remove();
+  MP = null;
+  var el = $('mapView'); if (el) el.remove();
+  if (!APP.sheets.length) document.body.classList.remove('locked');
+}
+function saveMapPrefs() { setPref('map', MP.o); }
+function setMapBase() {
+  var b = MAP_BASES[MP.o.base] || MAP_BASES.pale;
+  if (MP.tile) MP.tile.remove();
+  MP.tile = L.tileLayer(b[1], { maxZoom: 19, maxNativeZoom: b[2], attribution: MP.o.base === 'osm' ? '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' : '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>' }).addTo(MP.map);
+}
+
+// 表示の条件に合う点
+function mapSpots() {
+  var o = MP.o, out = [];
+  if (o.log) sortedLogs().forEach(function(x) {
+    if (!x.lat || !x.lng || o.off[x.category] || (o.rate && !(x.rating >= o.rate))) return;
+    var m = MAP_MARK[x.category] || ['記', 7];
+    out.push({ key: 'log:' + x.id, kind: 'log', id: x.id, at: [x.lat, x.lng], name: x.title, mark: m[0], color: 'pin-' + m[1], rating: x.rating || 0, sub: [dateKey(x.timestamp).slice(0, 10), x.category, x.address].filter(Boolean).join('・') });
+  });
+  if (o.stamp) { var st = stampStates(); STAMP_SPOTS.forEach(function(s) { out.push({ key: 'stamp:' + s.id, kind: 'stamp', id: s.id, at: [s.lat, s.lng], name: s.name, mark: '印', color: st[s.id] ? 'pin-1' : 'pin-0', rating: 0, sub: STAMP_CATS[s.cat].name + '・' + s.pref + (st[s.id] ? '・訪問済み' : '') }); }); }
+  if (o.road) roads().forEach(function(r) { var s = roadStatus(r.id); out.push({ key: 'road:' + r.id, kind: 'road', id: r.id, at: r.from, to: r.to, name: r.name, mark: r.no, color: s === 'done' ? 'pin-2' : s === 'want' ? 'pin-1' : 'pin-5', rating: 0, sub: r.section + (s === 'done' ? '・走破済み' : s === 'want' ? '・走りたい' : '') }); });
+  return out;
+}
+
+// 画面上で近いものは 1 つにまとめる（数字を出し、押すと広がる）
+function drawPins() {
+  if (!MP || !MP.map) return;
+  var spots = mapSpots(), z = MP.map.getZoom(), view = MP.map.getBounds().pad(0.2), cells = {}, shown = 0;
+  MP.layer.clearLayers();
+  spots.forEach(function(s) {
+    if (s.to) L.polyline([s.at, s.to], { color: '#5d6778', weight: 2, dashArray: '4 5', interactive: false }).addTo(MP.layer);
+    if (!view.contains(s.at)) return;
+    shown++;
+    var p = MP.map.project(s.at, z), k = z >= 17 ? s.key : Math.floor(p.x / 38) + ':' + Math.floor(p.y / 38);
+    (cells[k] = cells[k] || []).push(s);
+  });
+  var keys = Object.keys(cells), names = MP.o.names && (z >= 12 || keys.length <= 25);
+  keys.forEach(function(k) {
+    var g = cells[k].sort(function(a, b) { return (b.key === MP.sel) - (a.key === MP.sel) || b.rating - a.rating; }), s = g[0], many = g.length > 1;
+    var html = '<div class="pin ' + s.color + (s.rating >= 5 ? ' best' : '') + (s.key === MP.sel ? ' sel' : '') + '">' + esc(s.mark) + (many ? '<b>' + g.length + '</b>' : s.rating ? '<i>' + esc(s.rating) + '</i>' : '') + '</div>' + (names ? '<div class="pin-name">' + esc(s.name) + (many ? ' ほか' : '') + '</div>' : '');
+    L.marker(s.at, { icon: L.divIcon({ className: 'pin-wrap', html: html, iconSize: [26, 26], iconAnchor: [13, 13] }), zIndexOffset: s.key === MP.sel ? 1000 : s.rating * 10, title: s.name }).addTo(MP.layer).on('click', function() {
+      if (many && z < 17 && s.key !== MP.sel) { var b = L.latLngBounds(g.map(function(x) { return x.at; })); if (b.getNorthEast().distanceTo(b.getSouthWest()) > 15) { MP.map.fitBounds(b, { padding: [70, 70], maxZoom: 17 }); return; } }
+      MP.group = g; MP.sel = s.key; mapPanel(''); drawMapCard(); drawPins();
+    });
+  });
+  $('mapCount').textContent = shown + ' 件';
+}
+function fitMap() {
+  var s = mapSpots(), one = s.filter(function(x) { return x.key === MP.sel; })[0];
+  if (one) MP.map.setView(one.at, 15); else if (s.length) MP.map.fitBounds(s.map(function(x) { return x.at; }), { padding: [50, 50], maxZoom: 14 });
+  drawPins();
+}
+function drawMapCard() {
+  var box = $('mapCard'), s = MP.sel && mapSpots().filter(function(x) { return x.key === MP.sel; })[0];
+  box.classList.toggle('on', !!s);
+  if (!s) return;
+  var x = s.kind === 'log' ? store.get('log', s.id) : null, p = x ? photosOf(x) : [], same = (MP.group || []).filter(function(g) { return g.key !== s.key; });
+  box.innerHTML = '<div class="row">' + (p.length ? '<div class="thumb">' + photoTag(p[0], 'thumb') + '</div>' : '<div class="pin ' + s.color + '">' + esc(s.mark) + '</div>') + '<div class="grow"><b class="ell blk">' + esc(s.name) + '</b><div>' + (s.rating ? stars(s.rating) : '') + '</div><div class="muted ell">' + esc(s.sub) + '</div></div></div>' +
+    '<div class="row acts">' + (s.kind === 'log' ? '<button type="button" class="btn small primary" data-act="logOpen" data-id="' + esc(s.id) + '">記録を見る</button>' : s.kind === 'road' ? '<button type="button" class="btn small primary" data-act="roadOpen" data-id="' + esc(s.id) + '">くわしく</button>' : '<button type="button" class="btn small primary" data-act="stamp" data-id="' + esc(s.id) + '">スタンプ</button>') + '<a class="btn small" target="_blank" rel="noopener noreferrer" href="' + esc(mapUrl(s.kind === 'log' && x.address ? x.title + ' ' + x.address : s.at.join(','))) + '">Google マップ</a></div>' +
+    (same.length ? '<div class="chips">' + same.slice(0, 12).map(function(g) { return '<button type="button" class="chip" data-act="mapPick" data-key="' + esc(g.key) + '">' + esc(g.name) + '</button>'; }).join('') + '</div>' : '');
+  watchPhotos(box);
+}
+ACT.mapPick = function(el) {
+  var s = mapSpots().filter(function(x) { return x.key === el.dataset.key; })[0];
+  if (!s) return;
+  if (!MP.group || !MP.group.some(function(g) { return g.key === s.key; })) MP.group = [];
+  MP.sel = s.key; mapPanel('');
+  MP.map.setView(s.at, Math.max(MP.map.getZoom(), 15));
+  drawMapCard(); drawPins();
+};
+
+// ---- 右端のボタンとパネル ----
+ACT.mapBtn = function(el) {
+  var v = el.dataset.v;
+  if (v === 'close') { closeMap(); return; }
+  if (!MP.map) return;
+  if (v === 'fit') { MP.sel = ''; mapPanel(''); drawMapCard(); fitMap(); return; }
+  if (v === 'here') { mapPanel(''); locateMe(); return; }
+  mapPanel(MP.panel === v ? '' : v);
+};
+function mapPanel(v) {
+  MP.panel = v;
+  document.querySelectorAll('.map-btns button').forEach(function(b) { b.classList.toggle('on', b.dataset.v === v); });
+  var o = MP.o, cell = function(act, val, label, on) { return '<button type="button" class="' + (on ? 'on' : '') + '" data-act="mapSet" data-k="' + act + '" data-v="' + esc(val) + '" aria-pressed="' + !!on + '">' + esc(label) + '</button>'; };
+  var lack = v === 'show' ? store.list('log').filter(function(x) { return !(x.lat && x.lng) && x.address; }).length : 0;
+  $('mapPanel').className = 'map-panel p-' + v;
+  $('mapPanel').innerHTML = v === 'base' ? '<div class="cells">' + Object.keys(MAP_BASES).map(function(k) { return cell('base', k, MAP_BASES[k][0], o.base === k); }).join('') + '</div>'
+    : v === 'show' ? '<div class="cells">' + cell('layer', 'log', 'ログ', o.log) + cell('layer', 'stamp', '名所', o.stamp) + cell('layer', 'road', '百名道', o.road) + cell('names', '1', '名前', o.names) + '</div><div class="cells">' + Object.keys(cats()).map(function(k) { return cell('cat', k, k, !o.off[k]); }).join('') + '</div><div class="cells">' + [[0, '全評価'], [3, '★3〜'], [4, '★4〜'], [5, '★5']].map(function(r) { return cell('rate', r[0], r[1], o.rate === r[0]); }).join('') + '</div>' + (lack ? '<button type="button" class="wide" data-act="fillGeo">住所だけの ' + lack + ' 件の位置を調べる</button>' : '')
+    : v === 'find' ? '<input type="search" data-input="mapFind" placeholder="店名・場所・タグ" aria-label="地図の中を検索"><div id="mapFound"></div>' : '';
+  if (v === 'find') { INPUT.mapFind({ value: '' }); $('mapPanel').querySelector('input').focus(); }
+}
+ACT.mapSet = function(el) {
+  var o = MP.o, k = el.dataset.k, v = el.dataset.v;
+  if (k === 'base') { o.base = v; setMapBase(); }
+  if (k === 'layer') { o[v] = !o[v]; if (v === 'road' && o.road) loadHyaku(); }
+  if (k === 'names') o.names = !o.names;
+  if (k === 'cat') { if (o.off[v]) delete o.off[v]; else o.off[v] = true; }
+  if (k === 'rate') o.rate = Number(v);
+  saveMapPrefs();
+  mapPanel(MP.panel); drawMapCard(); drawPins();
+};
+INPUT.mapFind = function(el) {
+  var q = el.value.trim(), l = mapSpots().filter(function(s) { var x = s.kind === 'log' ? store.get('log', s.id) : null; return !q || matches([s.name, s.sub, x ? x.memo + ' ' + tagsOf('log', x).join(' ') : ''].join(' '), q); });
+  $('mapFound').innerHTML = l.slice(0, 8).map(function(s) { return '<button type="button" class="found" data-act="mapPick" data-key="' + esc(s.key) + '"><b class="ell blk">' + esc(s.name) + '</b><span class="muted ell blk">' + esc(s.sub) + '</span></button>'; }).join('') || '<p class="muted">見つかりません</p>';
+};
+function locateMe() {
+  if (!navigator.geolocation) { toast('この端末では現在地を使えません'); return; }
+  navigator.geolocation.getCurrentPosition(function(p) {
+    if (!MP || !MP.map) return;
+    var at = [p.coords.latitude, p.coords.longitude];
+    if (MP.me) MP.me.remove();
+    MP.me = L.circleMarker(at, { radius: 7, color: '#fff', weight: 2, fillColor: '#284379', fillOpacity: 1 }).addTo(MP.map);
+    MP.map.setView(at, 14);
+  }, function() { toast('現在地を取得できません'); }, { enableHighAccuracy: true, timeout: 10000 });
+}
+// 座標はサーバーで求めてシートに保存する（次からは求めない）
+ACT.fillGeo = function(el) {
+  var lack = store.list('log').filter(function(x) { return !(x.lat && x.lng) && x.address; }).slice(0, 20), ok = 0;
+  el.disabled = true;
+  lack.reduce(function(p, x) {
+    return p.then(function() { return callApi('geocode', { query: x.address }); }).then(function(g) { if (g.found) { ok++; store.patch('log', x.id, { lat: g.lat, lng: g.lng }); } });
+  }, Promise.resolve()).then(function() { toast(ok + ' 件の位置が分かりました'); if (MP) { mapPanel('show'); drawPins(); } }, function(e) { toast(e.message); });
+};
+
+// ============================================================
 // Mod_Misc : 記録＋・横断検索・設定・接続・共有メニュー
 // ============================================================
-var QV = { type: 'log', rating: 0, photos: [] };
 
 // ---- 記録＋（写真なしなら 3 操作: ＋ → タイトル → 記録する） ----
-ACT.quick = function() {
-  if (readDraft()) { openLogForm(); return; } // 書きかけがあれば続きから
-  openQuick({});
-};
-function openQuick(pre) {
-  QV = { type: pre.type || (APP.tab === 'memo' ? 'memo' : APP.tab === 'plan' ? 'wish' : 'log'), rating: 0, photos: pre.photos || [], cat: prefs().lastCat || 'グルメ', pre: pre };
-  openSheet('記録＋', '<form data-submit="quick" class="form" id="quickForm"></form>');
-  drawQuick({ title: pre.title || '', body: pre.text || '', url: pre.url || '' });
-}
-function drawQuick(v) {
-  var t = QV.type, url = v.url ? true : t !== 'log';
-  $('quickForm').innerHTML = '<div class="seg" style="margin:0">' + [['log', 'ログ'], ['wish', '気になる'], ['memo', 'メモ']].map(function(x) { return '<button type="button" class="' + (t === x[0] ? 'on' : '') + '" data-act="qType" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><label><span>タイトル</span><input name="title" value="' + esc(v.title) + '" autocomplete="off"></label>' +
-    (t === 'memo' ? '' : '<div class="chips wrap">' + Object.keys(cats()).map(function(k) { return '<button type="button" class="chip ' + (k === QV.cat ? 'on' : '') + '" data-act="qCat" data-v="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div>') +
-    (t === 'log' ? '<div class="rate">' + [1, 2, 3, 4, 5].map(function(n) { return '<button type="button" class="' + (n <= QV.rating ? 'on' : '') + '" data-act="qRate" data-v="' + n + '" aria-label="評価 ' + n + '">★</button>'; }).join('') + '</div>' : '') +
-    (url ? '<label><span>URL</span><input name="url" value="' + esc(v.url) + '"></label>' : '') + '<label><span>メモ</span><textarea name="memo" rows="3">' + esc(v.body) + '</textarea></label>' +
-    (QV.photos.length ? '<p class="muted">写真 ' + QV.photos.length + ' 枚' + (t === 'log' ? '' : '（ログのときだけ保存されます）') + '</p>' : '') +
-    '<div class="row" style="flex-wrap:wrap"><button type="button" class="btn small" data-act="qPaste">貼り付けて追加</button>' + (url ? '<button type="button" class="btn small" data-act="fetchMeta">題名を取得</button>' : '') + (t === 'log' ? '<button type="button" class="btn small" data-act="qDetail">写真・詳しく書く</button>' : '') + '</div><div class="form-foot"><button type="submit" class="btn primary">記録する</button></div>';
-  var f = $('quickForm').elements.title;
-  if (!v.title) f.focus();
-}
-function quickValues() { var e = $('quickForm').elements; return { title: e.title.value, body: e.memo.value, url: e.url ? e.url.value : '' }; }
-ACT.qType = function(el) { var v = quickValues(); QV.type = el.dataset.v; drawQuick(v); };
-ACT.qCat = function(el) { QV.cat = el.dataset.v; $('quickForm').querySelectorAll('.chip').forEach(function(b) { b.classList.toggle('on', b.dataset.v === QV.cat); }); };
-ACT.qRate = function(el) { var n = Number(el.dataset.v); QV.rating = QV.rating === n ? 0 : n; $('quickForm').querySelectorAll('.rate button').forEach(function(b, i) { b.classList.toggle('on', i < QV.rating); }); };
-ACT.qDetail = function() { var v = quickValues(), p = QV.photos; closeSheet(); openLogForm({ preset: { title: v.title, category: QV.cat, rating: QV.rating, memo: [v.body, v.url].filter(Boolean).join('\n') }, photos: p }); };
-// iPhone は共有先になれないため、コピーした内容を貼り付ける
-ACT.qPaste = function() {
-  var v = quickValues();
-  var put = function(t) {
-    var m = String(t || '').match(/https?:\/\/\S+/), rest = String(t || '').replace(m ? m[0] : '', '').trim();
-    if (m) v.url = m[0];
-    if (rest) { if (!v.title && rest.length <= 60 && rest.indexOf('\n') < 0) v.title = rest; else v.body = [v.body, rest].filter(Boolean).join('\n'); }
-    if (QV.type === 'log' && m) QV.type = 'memo';
-    drawQuick(v);
-  };
-  if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(put).catch(function() { toast('入力欄を長押しして貼り付けてください'); });
-  else toast('入力欄を長押しして貼り付けてください');
-};
-SUBMIT.quick = function() {
-  var v = quickValues(), title = v.title.trim(), body = v.body.trim(), url = safeUrl(v.url), me = store.st.server.me;
-  if (!title && !(QV.type === 'memo' && (body || url))) { toast('タイトルを入力してください'); return; }
-  if (QV.type === 'log') {
-    var id = store.add('log', { title: title, timestamp: nowStamp(), category: QV.cat, subCategory: '', rating: QV.rating, memo: [body, url].filter(Boolean).join('\n'), author: myName() });
-    setPref('lastCat', QV.cat);
-    if (QV.photos.length) attachPhotos(QV.photos, id).then(function() { renderSoon(); return store.flush(); }).then(uploadPhotos);
-  } else if (QV.type === 'wish') {
-    var w = { title: title, type: 'お店・スポット', category: QV.cat, author: myName(), regDate: ymd(new Date()), url: url, status: '気になる', memo: body };
-    if (me) w['like' + me.n] = 'true';
-    store.add('wish', w);
-  } else store.add('memo', { title: title, content: body, url: url, category: url ? 'Webクリップ' : MEMO_CATS[0], author: myName(), createdAt: nowStamp() });
-  if (QV.type !== 'log') QV.photos.forEach(photoDel);
-  closeSheet();
-  toast('記録しました');
-};
+ACT.quick = function() { if (APP.tab === 'memo') noteForm(null); else openLogForm(); };
 
 // ---- 横断検索 ----
 ACT.search = function() {
@@ -1555,11 +1778,11 @@ ACT.search = function() {
 };
 INPUT.gq = function(el) {
   var q = el.value.trim(), box = $('gres');
-  if (!q) { box.innerHTML = '<div class="chips wrap">' + allTags().slice(0, 24).map(function(t) { return '<button type="button" class="chip" data-act="tag" data-tag="' + esc(t.tag) + '">' + esc(t.tag) + ' ' + t.n + '</button>'; }).join('') + '</div>'; return; }
-  var defs = [['log', 'ログ', ['title', 'memo', 'category', 'subCategory', 'address', 'author'], 'logOpen', 'timestamp'], ['memo', 'メモ', ['title', 'content', 'url', 'category', 'author'], 'memoEdit', 'editedAt'], ['wish', '気になる', ['title', 'memo', 'category', 'subCategory', 'author'], 'wishEdit', 'status'], ['bucket', 'やりたいこと', ['title', 'memo', 'category', 'when'], 'bucketEdit', 'status'], ['goal', '目標', ['title', 'memo', 'category', 'targetYm'], 'goalEdit', 'targetYm'], ['holiday', '連休', ['name', 'destination', 'mainPlan', 'memo'], 'holEdit', 'startDate']];
+  if (!q) { box.innerHTML = '<div class="chips wrap">' + tagStats().slice(0, 30).map(function(t) { return '<button type="button" class="chip" data-act="tag" data-tag="#' + esc(t.tag) + '">#' + esc(t.tag) + '<small>' + t.n + '</small></button>'; }).join('') + '</div>'; return; }
+  var defs = [['log', 'ログ', ['title', 'memo', 'category', 'subCategory', 'address', 'author'], 'logOpen', 'timestamp'], ['memo', 'メモ', ['title', 'content', 'url', 'category', 'author'], 'noteEdit', 'due'], ['wish', 'メモ（気になる）', ['title', 'memo', 'category', 'subCategory', 'author'], 'noteEdit', 'due'], ['bucket', 'やりたいこと', ['title', 'memo', 'category', 'when'], 'bucketEdit', 'status'], ['goal', '目標', ['title', 'memo', 'category', 'targetYm'], 'goalEdit', 'targetYm'], ['holiday', '連休', ['name', 'destination', 'mainPlan', 'memo'], 'holEdit', 'startDate']];
   box.innerHTML = defs.map(function(d) {
-    var l = (d[0] === 'log' ? sortedLogs() : store.list(d[0])).filter(function(x) { return matches(d[2].map(function(k) { return x[k] || ''; }).join(' '), q); });
-    return l.length ? '<h3>' + d[1] + ' ' + l.length + '</h3><div class="card list">' + l.slice(0, 10).map(function(x) { return '<div class="item tap" data-act="' + d[3] + '" data-id="' + esc(x.id) + '"><div class="grow ell">' + esc(x.title || x.name || x.content || x.url) + '</div><span class="muted">' + esc(String(x[d[4]] || '').slice(0, 10)) + '</span></div>'; }).join('') + '</div>' : '';
+    var l = (d[0] === 'log' ? sortedLogs() : store.list(d[0])).filter(function(x) { return matches(d[2].map(function(k) { return x[k] || ''; }).concat(/^(log|memo|wish)$/.test(d[0]) ? tagsOf(d[0], x) : []).join(' '), q); });
+    return l.length ? '<h3>' + d[1] + ' ' + l.length + '</h3><div class="card list">' + l.slice(0, 10).map(function(x) { return '<div class="item tap" data-act="' + d[3] + '" data-id="' + esc(x.id) + '" data-key="' + d[0] + ':' + esc(x.id) + '"><div class="grow ell">' + esc(x.title || x.name || x.content || x.url) + '</div><span class="muted">' + esc(String(x[d[4]] || '').slice(0, 10)) + '</span></div>'; }).join('') + '</div>' : '';
   }).join('') || '<div class="empty">一致するものがありません</div>';
 };
 
@@ -1636,7 +1859,8 @@ function takeShared() {
       }).then(function(ids) {
         ids = ids.filter(Boolean);
         var text = [info.text, info.url].filter(Boolean).join('\n'), m = text.match(/https?:\/\/\S+/), rest = text.replace(m ? m[0] : '', '').trim();
-        openQuick({ type: ids.length ? 'log' : m ? 'memo' : 'log', title: info.title || '', url: m ? m[0] : '', text: rest, photos: ids });
+        if (ids.length) openLogForm({ preset: { title: info.title || '', memo: text }, photos: ids });
+        else noteForm(null, { title: info.title || '', url: m ? m[0] : '', body: rest });
         return caches.delete('couplelog-inbox');
       });
     });

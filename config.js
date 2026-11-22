@@ -1,1 +1,1 @@
-window.APP_ENDPOINT="https://script.google.com/macros/s/AKfycbzm09OobkU5fypyM7lPzr2Tezi-mq4cj1Z8aX508Ak9-9KuWuyMqronCS_Y2wU0AZoj/exec";window.APP_VERSION="932a93359d4a";
+window.APP_ENDPOINT="https://script.google.com/macros/s/AKfycbzm09OobkU5fypyM7lPzr2Tezi-mq4cj1Z8aX508Ak9-9KuWuyMqronCS_Y2wU0AZoj/exec";window.APP_VERSION="8d2dd482b69c";
