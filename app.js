@@ -46,7 +46,8 @@ function extractTags(text) {
 }
 
 // エスケープしてから、リンク・タグ・[写真1] だけを部品に置き換える
-function richText(text, photos) {
+// [写真1] の位置に写真を出す（size: 一覧は thumb、詳細は full）
+function richText(text, photos, size) {
   var html = '', last = 0, m;
   var re = new RegExp('(https?:\\/\\/[^\\s<>"\'）)」』】]+)|\\[(?:photo|写真)\\s*:?\\s*(\\d+)\\]|(^|[\\s\\u3000、。,.!?！？()（）「」『』【】])(#[' + TAG_CHARS + ']{1,30})', 'gi');
   var s = String(text || '');
@@ -55,13 +56,19 @@ function richText(text, photos) {
     if (m[1]) html += '<a href="' + esc(m[1]) + '" target="_blank" rel="noopener noreferrer">' + esc(m[1]) + '</a>';
     else if (m[2]) {
       var p = (photos || [])[m[2] - 1];
-      html += p ? '<span class="inline-photo" data-act="lightbox" data-i="' + (m[2] - 1) + '">' + photoTag(p, 'full') + '</span>' : esc(m[0]);
+      html += p ? '<span class="inline-photo" data-act="lightbox" data-i="' + (m[2] - 1) + '">' + photoTag(p, size || 'full') + '</span>' : esc(m[0]);
     } else html += esc(m[3]) + '<button type="button" class="tag" data-act="tag" data-tag="' + esc(m[4]) + '">' + esc(m[4]) + '</button>';
     last = m.index + m[0].length;
   }
   return html + esc(s.slice(last));
 }
 
+// 本文で場所を指定された写真の番号（0 始まり）
+function placedPhotos(text, count) {
+  var out = [], re = /\[(?:photo|写真)\s*:?\s*(\d+)\]/gi, m;
+  while ((m = re.exec(String(text || ''))) !== null) { var i = Number(m[1]) - 1; if (i >= 0 && i < count && out.indexOf(i) < 0) out.push(i); }
+  return out;
+}
 // 評価: 数字・意味の言葉・線
 function rateLabel(r) { var n = Math.round(Number(r) || 0), g = RATE_GUIDE.filter(function(x) { return x[0] === n; })[0]; return g ? g[1] : ''; }
 function ratingBlock(r, cls) {
@@ -945,7 +952,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && e.ta
 // ============================================================
 // Mod_Log : ログの一覧（写真 / ブログ / カード / 表 / 地図）・詳細・再訪・タイムカプセル
 // ============================================================
-var LV = { view: ['photo', 'blog', 'card', 'table'].indexOf(prefs().logView) >= 0 ? prefs().logView : 'photo', q: '', cat: '', sub: '', rating: '', author: '', sort: 'new', shown: 30, open: false, capsule: 0, capsuleOff: false, long: {} };
+var LV = { view: ['photo', 'blog', 'card'].indexOf(prefs().logView) >= 0 ? prefs().logView : 'photo', q: '', cat: '', sub: '', rating: '', author: '', sort: 'new', shown: 30, open: false, capsule: 0, capsuleOff: false, long: {} };
 
 function sortedLogs() { return store.list('log').slice().sort(function(a, b) { return dateKey(b.timestamp).localeCompare(dateKey(a.timestamp)) || String(b.id).localeCompare(String(a.id)); }); }
 function scoresOf(l) { return [l.s1, l.s2, l.s3, l.s4, l.s5]; }
@@ -985,7 +992,7 @@ function logTags() {
 function taglist(type, x) { var t = tagsOf(type, x); return t.length ? '<div class="taglist">' + tagButtons(t) + '</div>' : ''; }
 
 RENDER.log = function() {
-  var views = [['photo', '写真'], ['blog', 'ブログ'], ['card', 'カード'], ['table', '表']];
+  var views = [['photo', '写真'], ['blog', 'ブログ'], ['card', 'カード']];
   var active = [LV.cat, LV.sub, LV.rating, LV.author].filter(Boolean).length;
   $('main').innerHTML = '<div class="seg">' + views.map(function(v) { return '<button type="button" class="' + (LV.view === v[0] ? 'on' : '') + '" data-act="logView" data-v="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '<button type="button" data-act="openMap" data-layer="log">地図</button></div>' +
     '<div class="row"><input type="search" class="grow" placeholder="検索・#タグ" value="' + esc(LV.q) + '" data-input="logQ" aria-label="ログを検索"><button type="button" class="btn" data-act="logFilter" aria-expanded="' + LV.open + '">絞り込み' + (active ? ' ' + active : '') + '</button></div>' +
@@ -995,7 +1002,7 @@ RENDER.log = function() {
       '<select data-change="logF" data-k="rating" aria-label="評価">' + options([['', '評価'], ['5', '5.0'], ['4', '4.0'], ['3', '3.0'], ['2', '2.0'], ['1', '1.0']], LV.rating) + '</select>' +
       '<select data-change="logF" data-k="author" aria-label="投稿者">' + options([['', '投稿者']].concat(names()), LV.author) + '</select>' +
       '<select data-change="logF" data-k="sort" aria-label="並べ替え">' + options([['new', '新しい順'], ['old', '古い順'], ['rate', '評価の高い順']], LV.sort) + '</select>' +
-      '<button type="button" class="btn small" data-act="logClear">条件を消す</button></div>' +
+      '<button type="button" class="btn small" data-act="logClear">消す</button></div>' +
     '<div class="chips tagrow">' + logTags().slice(0, 14).map(function(t) { return '<button type="button" class="chip ' + (LV.q.toLowerCase() === '#' + t.toLowerCase() ? 'on' : '') + '" data-act="tag" data-tag="#' + esc(t) + '">#' + esc(t) + '</button>'; }).join('') + '</div>' +
     '<div id="capsule"></div><div id="logList"></div>';
   RENDER.logList();
@@ -1009,9 +1016,6 @@ RENDER.logList = function() {
     var p = photosOf(x);
     return '<button type="button" class="pcell" data-act="logOpen" data-id="' + esc(x.id) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="nophoto">' + esc(String(x.memo || '').slice(0, 40)) + '</span>') + (p.length > 1 ? '<span class="cnt">' + p.length + '</span>' : '') + '<span class="cap">' + esc(x.title || '無題') + '</span>' + (x.rating ? '<span class="score">' + esc(Number(x.rating).toFixed(1)) + '</span>' : '') + '</button>';
   }).join('') + '</div>';
-  else if (LV.view === 'table') html = '<div class="tbl"><table><thead><tr><th>日付</th><th>タイトル</th><th>評価</th><th>分類</th><th>中分類</th><th>価格</th><th>投稿者</th></tr></thead><tbody>' + page.map(function(x) {
-    return '<tr data-act="logOpen" data-id="' + esc(x.id) + '" tabindex="0"><td>' + esc(dateKey(x.timestamp).slice(0, 10)) + '</td><td>' + esc(x.title) + '</td><td>' + (x.rating ? esc(Number(x.rating).toFixed(1)) : '—') + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.subCategory || '-') + '</td><td>' + esc(x.price || '-') + '</td><td>' + esc(x.author) + '</td></tr>';
-  }).join('') + '</tbody></table></div>';
   else html = page.map(function(x) { return LV.view === 'blog' ? blogCard(x, ix) : dataCard(x, ix); }).join('');
   box.innerHTML = html + (l.length > LV.shown ? '<button type="button" class="btn more" data-act="logMore">もっと見る（残り ' + (l.length - LV.shown) + '）</button>' : '');
   watchPhotos($('main'));
@@ -1019,10 +1023,10 @@ RENDER.logList = function() {
 };
 
 // 長い文章は畳み、「続きを読む」で全部を開く（畳む必要があるときだけボタンを出す）
-function longText(text, photos, key, lines) {
+function longText(text, photos, key, lines, size) {
   if (!text) return '';
   var open = LV.long[key];
-  return '<div class="long' + (open ? ' open' : '') + '"><div class="text" style="--lines:' + lines + '">' + richText(text, photos) + '</div><button type="button" class="morelink" data-act="longToggle" data-key="' + esc(key) + '"' + (open ? '' : ' hidden') + '>' + (open ? '閉じる' : '続きを読む') + '</button></div>';
+  return '<div class="long' + (open ? ' open' : '') + '"><div class="text" style="--lines:' + lines + '">' + richText(text, photos, size) + '</div><button type="button" class="morelink" data-act="longToggle" data-key="' + esc(key) + '"' + (open ? '' : ' hidden') + '>' + (open ? '閉じる' : '続きを読む') + '</button></div>';
 }
 function checkLong(root) { root.querySelectorAll('.long:not(.open)').forEach(function(el) { var t = el.firstChild; el.lastChild.hidden = t.scrollHeight <= t.clientHeight + 2; }); }
 ACT.longToggle = function(el) {
@@ -1036,17 +1040,24 @@ function scoreLine(x) {
   var l = catOf(x.category).scores, v = scoresOf(x);
   return l.length && v.some(function(s) { return s > 0; }) ? '<div class="scoreline">' + l.map(function(t, i) { return '<span>' + esc(t) + '<b>' + (v[i] || '—') + '</b></span>'; }).join('') + '</div>' : '';
 }
+// 写真の並べ方: 本文に [写真N] があればその位置に。ほかの写真は、1 枚目を本文の前、残りを本文の後に並べる（旧版と同じ）
+function photoFlow(x, p, key, lines, size) {
+  var placed = placedPhotos(x.memo, p.length), rest = p.map(function(_, i) { return i; }).filter(function(i) { return placed.indexOf(i) < 0; });
+  var cell = function(i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(p[i], 'thumb') + '</div>'; };
+  var lead = !placed.length && rest.length ? rest.shift() : -1;
+  return (lead >= 0 ? '<div class="lead-photo">' + cell(lead) + '</div>' : '') + (key ? longText(x.memo, p, key, placed.length ? 30 : lines, size) : x.memo ? '<div class="text full">' + richText(x.memo, p, size) + '</div>' : '') + (rest.length ? '<div class="photo-grid">' + rest.map(cell).join('') + '</div>' : '');
+}
 function blogCard(x, ix) {
   var p = photosOf(x), id = esc(x.id);
-  return '<article class="card blog" data-id="' + id + '"><div class="row between">' + catLine(x) + '<span class="muted">' + esc(dateLabel(x.timestamp)) + '</span></div><h2 class="ttl tap" data-act="logOpen" data-id="' + id + '">' + esc(x.title || '無題') + '</h2><div class="row between wrap">' + ratingBlock(x.rating) + '<span class="row">' + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</span></div>' + scoreLine(x) +
-    (p.length ? '<div class="blog-photos ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') + longText(x.memo, p, 'log:' + x.id, 8) + taglist('log', x) +
+  return '<article class="entry blog" data-id="' + id + '"><div class="row between">' + catLine(x) + '<span class="muted">' + esc(dateLabel(x.timestamp)) + '</span></div><h2 class="ttl tap" data-act="logOpen" data-id="' + id + '">' + esc(x.title || '無題') + '</h2><div class="row between wrap">' + ratingBlock(x.rating) + '<span class="row">' + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</span></div>' + scoreLine(x) +
+    photoFlow(x, p, 'log:' + x.id, 8, 'thumb') + taglist('log', x) +
     '<div class="row between foot"><span class="muted ell">' + esc(x.address) + '</span><span class="muted">' + esc(x.author) + '</span></div></article>';
 }
 function dataCard(x, ix) {
-  var p = photosOf(x), m = MAP_MARK[x.category] || ['記', 7], id = esc(x.id), chart = radar(catOf(x.category).scores, scoresOf(x), 178);
-  return '<article class="card dcard" data-id="' + id + '"><div class="dtop"><button type="button" class="dthumb" data-act="logOpen" data-id="' + id + '" aria-label="' + esc(x.title) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="pin pin-' + m[1] + '">' + m[0] + '</span>') + '</button>' +
-    '<div class="dbody">' + catLine(x) + '<h2 class="ttl tap ell2" data-act="logOpen" data-id="' + id + '">' + esc(x.title || '無題') + '</h2><div class="muted ell">' + esc([dateLabel(x.timestamp), x.author, x.price].filter(Boolean).join('・')) + '</div><div class="row wrap">' + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</div></div></div>' +
-    '<div class="dscore">' + ratingBlock(x.rating, 'big') + chart + '</div>' + taglist('log', x) + '</article>';
+  var p = photosOf(x), m = MAP_MARK[x.category] || ['記', 7], id = esc(x.id), chart = radar(catOf(x.category).scores, scoresOf(x), 150);
+  return '<article class="entry dcard" data-id="' + id + '"><div class="dmain"><div class="dtop"><button type="button" class="dthumb" data-act="logOpen" data-id="' + id + '" aria-label="' + esc(x.title) + '">' + (p.length ? photoTag(p[0], 'thumb') : '<span class="pin pin-' + m[1] + '">' + m[0] + '</span>') + '</button>' +
+    '<div class="dbody">' + catLine(x) + '<h2 class="ttl tap ell" data-act="logOpen" data-id="' + id + '">' + esc(x.title || '無題') + '</h2></div></div>' +
+    ratingBlock(x.rating) + '<div class="muted ell">' + esc([dateLabel(x.timestamp), x.author, x.price].filter(Boolean).join('・')) + '</div><div class="row wrap">' + visitBadge(x, ix) + (x._pending ? '<span class="pill">未送信</span>' : '') + taglist('log', x) + '</div></div>' + (chart || '') + '</article>';
 }
 
 
@@ -1070,11 +1081,11 @@ ACT.logOpen = function(el) { openLog(el.dataset.id); };
 function openLog(id) {
   var x = store.get('log', id);
   if (!x) return;
-  var p = photosOf(x), labels = catOf(x.category).scores, chart = radar(labels, scoresOf(x), 220), tags = tagsOf('log', x), q = [x.title, x.address].filter(Boolean).join(' ');
+  var p = photosOf(x), labels = catOf(x.category).scores, chart = radar(labels, scoresOf(x), 220), tags = tagsOf('log', x), q = [x.title, x.address].filter(Boolean).join(' '), placed = placedPhotos(x.memo, p.length), heroIdx = p.map(function(_, i) { return i; }).filter(function(i) { return placed.indexOf(i) < 0; });
   var item = function(k, v) { return '<div><dt>' + k + '</dt><dd>' + (v || '<span class="muted">—</span>') + '</dd></div>'; };
   var place = x.address || x.lat ? '<a href="' + esc(mapUrl(x.address ? q : x.lat + ',' + x.lng)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.address || '座標あり') + '</a>' + (x.lat ? ' <button type="button" class="btn small" data-act="openMap" data-layer="log" data-id="' + esc(id) + '">地図</button>' : '') : '';
   openSheet('記録', '<div class="detail" data-id="' + esc(id) + '">' +
-    (p.length ? '<div class="blog-photos hero ' + (p.length === 1 ? 'one' : '') + '">' + p.map(function(f, i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(f, 'thumb') + '</div>'; }).join('') + '</div>' : '') +
+    (heroIdx.length ? '<div class="blog-photos hero ' + (heroIdx.length === 1 ? 'one' : '') + '">' + heroIdx.map(function(i) { return '<div data-act="lightbox" data-i="' + i + '">' + photoTag(p[i], 'thumb') + '</div>'; }).join('') + '</div>' : '') +
     '<div class="row between">' + catLine(x) + '<span class="row">' + visitBadge(x, visitIndex()) + (x._pending ? '<span class="pill">未送信</span>' : '') + '</span></div><h2 class="ttl big">' + esc(x.title || '無題') + '</h2><p class="muted">' + esc(dateLabel(x.timestamp)) + ' ' + esc(dateKey(x.timestamp).slice(11)) + '・' + esc(x.author) + '</p>' +
     '<div class="card dscore">' + ratingBlock(x.rating, 'big') + chart + '</div>' +
     '<dl class="facts">' + item('大分類', esc(x.category)) + item('中分類', esc(x.subCategory)) + item('タグ', tags.length ? '<span class="taglist">' + tagButtons(tags) + '</span>' : '') + (catOf(x.category).prices.length || x.price ? item(x.category === 'レシピ' ? '所要時間' : '価格帯', esc(x.price)) : '') + item('場所', place) + '</dl>' +
@@ -1167,7 +1178,7 @@ function drawLogForm() {
     sec('分類', '<div class="chips wrap">' + Object.keys(cats()).concat(v.category && !cats()[v.category] ? [v.category] : []).map(function(k) { return '<button type="button" class="chip ' + (k === v.category ? 'on' : '') + '" data-act="lfCat" data-v="' + esc(k) + '">' + esc(k) + '</button>'; }).join('') + '</div><div class="two"><select name="subCategory" data-change="lf" aria-label="中分類">' + options([['', '中分類']].concat(c.sub), v.subCategory) + '</select>' + (c.prices.length ? '<select name="price" data-change="lf" aria-label="価格帯・時間">' + options([['', v.category === 'レシピ' ? '所要時間' : '価格帯']].concat(c.prices), v.price) + '</select>' : '') + '</div>') +
     sec('総合評価', '<div class="guide">' + RATE_GUIDE.map(function(g) { var on = (v.rating || 0) === g[0]; return '<button type="button" class="' + (on ? 'on' : '') + '" data-act="lfRate" data-v="' + g[0] + '" aria-pressed="' + on + '"><span class="st">' + g[0] + '.0</span><span class="grow"><b>' + g[1] + '</b><span class="muted blk">' + g[2] + '</span></span></button>'; }).join('') + '</div>', 'もう一度押すと未評価') +
     (c.scores.length ? sec('項目別の評価', '<div class="scores">' + c.scores.map(function(t, i) { return '<div><span>' + esc(t) + '</span>' + scoreDots('s' + (i + 1)) + '</div>'; }).join('') + '</div>', '任意') : '') +
-    sec('写真', '<div class="fphotos">' + ph.map(function(f, i) { return '<div>' + photoTag(f.p, 'thumb') + '<button type="button" class="n" data-act="lfMark" data-n="' + (i + 1) + '" aria-label="本文に写真' + (i + 1) + 'を入れる">写真' + (i + 1) + '</button><button type="button" class="x" data-act="lfDel" data-kind="' + f.kind + '" data-key="' + esc(f.key) + '" aria-label="写真を外す">' + icon('close') + '</button></div>'; }).join('') + '<label>' + icon('camera') + '<input type="file" accept="image/*" multiple data-change="lfFile" aria-label="写真を選ぶ"></label></div><div id="lfGps">' + gpsHint() + '</div>', '位置情報は取り除いて保存') +
+    sec('写真', '<div class="fphotos">' + ph.map(function(f, i) { return '<div>' + photoTag(f.p, 'thumb') + '<button type="button" class="n" data-act="lfMark" data-n="' + (i + 1) + '" aria-label="写真' + (i + 1) + 'を本文に入れる">本文へ ' + (i + 1) + '</button><button type="button" class="x" data-act="lfDel" data-kind="' + f.kind + '" data-key="' + esc(f.key) + '" aria-label="写真を外す">' + icon('close') + '</button></div>'; }).join('') + '<label>' + icon('camera') + '<input type="file" accept="image/*" multiple data-change="lfFile" aria-label="写真を選ぶ"></label></div>' + (ph.length ? '<p class="muted hint">「本文へ」を押すと、感想・メモのカーソルの位置に写真が入ります（写真→文章→写真の順に並べられます）</p>' : '') + '<div id="lfGps">' + gpsHint() + '</div>', '位置情報は取り除いて保存') +
     sec('感想・メモ', '<textarea name="memo" rows="5" data-input="lf" aria-label="感想・メモ">' + esc(v.memo) + '</textarea>' + (v.category === 'レシピ' ? '<button type="button" class="btn small" data-act="lfRecipe">レシピのひな形</button>' : '')) +
     sec('タグ', tagBox({ list: LF.tags, skip: [WANT_TAG, v.category], weight: function(type, x) { return type === 'log' ? (x.category === v.category ? 5 : 1) : 0.3; }, on: function() { LF.tags = TP.list; saveDraft(); } }), '押すだけで付きます') +
     '<section class="fs"><button type="button" class="moreh" data-act="lfMore" aria-expanded="' + !!LF.more + '"><h3>日時・場所・投稿者</h3><span class="muted ell" id="lfSum">' + esc(lfSummary()) + '</span>' + icon(LF.more ? 'up' : 'down') + '</button>' + (LF.more ? '<div class="two"><input type="datetime-local" name="timestamp" value="' + esc(normDate(v.timestamp).replace(' ', 'T').slice(0, 16)) + '" data-input="lf" aria-label="日時"><select name="author" data-change="lf" aria-label="投稿者">' + options(names(), v.author) + '</select></div><div class="row"><input name="address" value="' + esc(v.address) + '" data-input="lf" placeholder="住所・場所（空ならタイトルで調べます）" aria-label="場所"><button type="button" class="btn small" data-act="lfGeo">調べる</button></div>' : '') + '</section>' +
@@ -1722,7 +1733,7 @@ function openMap(layer, id) {
   closeMap();
   var el = document.createElement('div');
   el.id = 'mapView';
-  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">Futari Map</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
+  el.innerHTML = '<div id="mapCanvas"></div><div class="map-brand">ふたりの地図</div><div class="map-count" id="mapCount"></div><div class="map-panel" id="mapPanel"></div>' +
     '<div class="map-btns">' + [['base', '地図'], ['show', '表示'], ['find', '検索'], ['here', '現在地'], ['fit', '全体'], ['close', '閉じる']].map(function(b) { return '<button type="button" data-act="mapBtn" data-v="' + b[0] + '">' + b[1] + '</button>'; }).join('') + '</div><div class="map-card" id="mapCard"></div>';
   document.body.appendChild(el);
   document.body.classList.add('locked');
