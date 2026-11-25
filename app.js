@@ -131,6 +131,16 @@ var ICONS = {
   close: 'M6 6l12 12M18 6L6 18', down: 'M6 9l6 6 6-6', up: 'M6 15l6-6 6 6', edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4', map: 'M9 4L3 6.500v13.500l6-2.500 6 2.500 6-2.500V4l-6 2.500zM9 4v13.500M15 6.500V20', heart: 'M12 20s-7.500-4.600-9-9.500C2 7 4.500 4.500 7.500 4.500c2 0 3.500 1.200 4.500 2.700 1-1.500 2.500-2.700 4.500-2.700 3 0 5.500 2.500 4.500 6C19.500 15.400 12 20 12 20z', check: 'M5 12.500l4.500 4.500L19 7.500', pin: 'M9 3h6l-1 6 4 4H6l4-4zM12 13v8', clock: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3.500 2', left: 'M15 5l-7 7 7 7', right: 'M9 5l7 7-7 7', camera: 'M4 8h4l1.500-3h5L16 8h4v11H4zM12 16.500a3.500 3.500 0 100-7 3.500 3.500 0 000 7z'
 };
 function icon(n) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICONS[n] + '"/></svg>'; }
+// 共有で届いた題名・本文・URL を分ける
+function sharedParts(info) {
+  var text = [info.text, info.url].filter(Boolean).join('\n'), m = text.match(/https?:\/\/[^\s<>"]+/), url = m ? m[0] : '', rest = (url ? text.split(url).join('') : text).trim(), title = String(info.title || '').trim();
+  if (rest && !title && rest.length <= 80 && rest.indexOf('\n') < 0) { title = rest; rest = ''; }
+  if (rest === title) rest = '';
+  // 題名が空・URL だけ・アプリ名だけなら取りに行く
+  var fetch = !!url && (!title || /^https?:/.test(title) || /^(YouTube|ふたりログ)$/i.test(title));
+  if (fetch && !/^https?:/.test(title)) title = '';
+  return { text: text, url: url, rest: rest, title: title, fetch: fetch };
+}
 
 // ============================================================
 // Core_State : 端末の控え・送信待ち・取得内容の重ね合わせ（画面に依存しない。テストから直接動かす）
@@ -579,6 +589,110 @@ var RECIPE = '【材料（2人分）】\n・\n・\n\n【作り方】\n1. \n2. \n
 function whenOptions() { var y = new Date().getFullYear(); return ['', y + '年内', (y + 1) + '年', (y + 2) + '年', '3年以内', '5年以内', 'いつか必ず']; }
 function isDone(s) { return s === '達成' || s === '達成済' || s === '完了'; }
 function isVisited(s) { return /訪問済|完了|達成/.test(String(s || '')); }
+
+// ============================================================
+// Data_Calendar : 祝日・連休・毎年の行事を計算する（通信しない。保存もしない）
+// ============================================================
+// 祝日は「国民の祝日に関する法律」の 2020 年以降の決まりで計算する（振替休日・国民の休日を含む）。
+// 春分・秋分は 1980〜2099 年の近似式。
+function calKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function calDay(s) { var m = String(s).split('-'); return new Date(+m[0], m[1] - 1, +m[2]); }
+function calAdd(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+// n 番目の月曜日
+function calMonday(y, m, n) { var d = new Date(y, m - 1, 1); return calKey(new Date(y, m - 1, 1 + (8 - d.getDay()) % 7 + (n - 1) * 7)); }
+
+var CAL_CACHE = {};
+function jpHolidays(y) {
+  if (CAL_CACHE[y]) return CAL_CACHE[y];
+  var h = {}, put = function(m, d, name) { h[y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0')] = name; }, b = y - 1980, leap = Math.floor(b / 4);
+  put(1, 1, '元日'); h[calMonday(y, 1, 2)] = '成人の日'; put(2, 11, '建国記念の日'); put(2, 23, '天皇誕生日');
+  put(3, Math.floor(20.8431 + 0.242194 * b - leap), '春分の日'); put(4, 29, '昭和の日'); put(5, 3, '憲法記念日'); put(5, 4, 'みどりの日'); put(5, 5, 'こどもの日');
+  h[calMonday(y, 7, 3)] = '海の日'; put(8, 11, '山の日'); h[calMonday(y, 9, 3)] = '敬老の日'; put(9, Math.floor(23.2488 + 0.242194 * b - leap), '秋分の日');
+  h[calMonday(y, 10, 2)] = 'スポーツの日'; put(11, 3, '文化の日'); put(11, 23, '勤労感謝の日');
+  Object.keys(h).sort().forEach(function(k) {
+    var d = calDay(k);
+    // 振替休日: 日曜の祝日のあと、最初の祝日でない日
+    if (d.getDay() === 0) { var n = calAdd(d, 1); while (h[calKey(n)]) n = calAdd(n, 1); h[calKey(n)] = '振替休日'; }
+  });
+  // 国民の休日: 祝日にはさまれた平日
+  Object.keys(h).sort().forEach(function(k) {
+    var mid = calAdd(calDay(k), 1), next = calKey(calAdd(mid, 1));
+    if (!h[calKey(mid)] && h[next] && h[next] !== '振替休日' && mid.getDay() !== 0) h[calKey(mid)] = '国民の休日';
+  });
+  return (CAL_CACHE[y] = h);
+}
+function holidayName(d) { return jpHolidays(d.getFullYear())[calKey(d)] || ''; }
+// 休みの日（土日・祝日。opt.newYear なら 12/29〜1/3 も）
+function isOffDay(d, opt) {
+  if (d.getDay() === 0 || d.getDay() === 6 || holidayName(d)) return true;
+  var md = (d.getMonth() + 1) * 100 + d.getDate();
+  return !!(opt && opt.newYear) && (md >= 1229 || md <= 103);
+}
+
+// 季節の行事（毎年同じ日）
+var CAL_EVENTS = [[2, 14, 'バレンタインデー'], [3, 14, 'ホワイトデー'], [7, 7, '七夕'], [10, 31, 'ハロウィン'], [12, 24, 'クリスマスイブ'], [12, 25, 'クリスマス'], [12, 31, '大晦日']];
+// 自動で出せるものの種類（設定で入り切りする）
+var AUTO_KINDS = [['long', '祝日でできる連休（3 連休以上）'], ['bridge', '1 日休めば 4 連休以上になる日'], ['event', '季節の行事（クリスマス・バレンタインなど）'], ['yearly', '毎年の記念日（誕生日など、自分で登録したもの）'], ['newYear', '年末年始（12/29〜1/3）を休みとして数える']];
+var AUTO_DEFAULT = { long: true, bridge: true, event: true, yearly: true, newYear: true };
+
+function stretchName(days) {
+  var md = days.map(function(d) { return (d.getMonth() + 1) * 100 + d.getDate(); });
+  if (md.some(function(v) { return v >= 1229 || v <= 103; }) && days.length >= 5) return '年末年始';
+  if (md.some(function(v) { return v >= 429 && v <= 506; }) && days.length >= 4) return 'ゴールデンウィーク';
+  if (md.some(function(v) { return v >= 915 && v <= 924; }) && days.length >= 5) return 'シルバーウィーク';
+  for (var i = 0; i < days.length; i++) { var n = holidayName(days[i]); if (n && n !== '振替休日' && n !== '国民の休日') return n; }
+  return '連休';
+}
+
+// from（Date）から n 日の間に自動で出す予定。yearly = [{name, startDate, endDate, id}]（毎年くり返す登録）
+// 返す形: {key, kind, name, startDate, endDate, days, note}
+function autoPlans(from, n, opt, yearly) {
+  opt = Object.assign({}, AUTO_DEFAULT, opt || {});
+  var out = [], start = calAdd(from, 0), end = calAdd(start, n), off = [], i;
+  // 少し前から数える（今日を含む連休を途中から切らない）
+  var base = calAdd(start, -10), len = n + 20;
+  for (i = 0; i < len; i++) off.push(isOffDay(calAdd(base, i), opt));
+  var runs = [];
+  for (i = 0; i < len; i++) if (off[i] && (i === 0 || !off[i - 1])) { var j = i; while (j + 1 < len && off[j + 1]) j++; runs.push([i, j]); }
+  var inRange = function(a, b) { return calAdd(base, b) >= start && calAdd(base, a) < end; };
+  var days = function(a, b) { var l = []; for (var k = a; k <= b; k++) l.push(calAdd(base, k)); return l; };
+  if (opt.long) runs.forEach(function(r) {
+    var L = r[1] - r[0] + 1, l = days(r[0], r[1]);
+    if (L >= 3 && l.some(function(d) { return holidayName(d) || !isOffDay(d, { newYear: false }); }) && inRange(r[0], r[1]))
+      out.push({ key: 'auto:long:' + calKey(l[0]), kind: 'long', name: stretchName(l) + 'の' + L + '連休', startDate: calKey(l[0]), endDate: calKey(l[L - 1]), days: L, note: '' });
+  });
+  // 休みにはさまれた平日 1 日
+  if (opt.bridge) for (i = 1; i < runs.length; i++) {
+    var a = runs[i - 1], b = runs[i];
+    if (b[0] - a[1] !== 2) continue;
+    var L2 = b[1] - a[0] + 1, gap = calAdd(base, a[1] + 1);
+    if (L2 < 4 || !inRange(a[0], b[1])) continue;
+    var l2 = days(a[0], b[1]);
+    if (!l2.some(function(d) { return holidayName(d); })) continue;
+    out.push({ key: 'auto:bridge:' + calKey(gap), kind: 'bridge', name: (gap.getMonth() + 1) + '/' + gap.getDate() + '（' + '日月火水木金土'[gap.getDay()] + '）を休めば' + L2 + '連休', startDate: calKey(l2[0]), endDate: calKey(l2[L2 - 1]), days: L2, note: stretchName(l2) });
+  }
+  var years = [start.getFullYear(), start.getFullYear() + 1, start.getFullYear() + 2];
+  if (opt.event) years.forEach(function(y) {
+    CAL_EVENTS.forEach(function(e) {
+      var d = new Date(y, e[0] - 1, e[1]);
+      if (d >= start && d < end) out.push({ key: 'auto:event:' + calKey(d), kind: 'event', name: e[2], startDate: calKey(d), endDate: '', days: 1, note: '' });
+    });
+  });
+  if (opt.yearly) (yearly || []).forEach(function(x) {
+    var m = String(x.startDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return;
+    var e = String(x.endDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/), span = e ? Math.round((calDay(e[0]) - calDay(m[0])) / 864e5) : 0;
+    years.forEach(function(y) {
+      if (y < +m[1]) return;
+      var d = new Date(y, m[2] - 1, +m[3]);
+      if (d.getMonth() !== m[2] - 1) d = new Date(y, m[2] - 1, 28); // 2/29 → 平年は 2/28
+      if (calAdd(d, span) < start || d >= end) return;
+      var age = y - +m[1];
+      out.push({ key: 'auto:yearly:' + x.id + ':' + y, kind: 'yearly', id: x.id, name: x.name, startDate: calKey(d), endDate: span ? calKey(calAdd(d, span)) : '', days: span + 1, note: age > 0 ? age + '回目' : '' });
+    });
+  });
+  return out.sort(function(p, q) { return p.startDate < q.startDate ? -1 : p.startDate > q.startDate ? 1 : 0; });
+}
 
 // extract_data.mjs が生成。名所
 var STAMP_CATS = {"castle":{"name":"お城","ranks":["足軽","侍大将","城主","天下人"],"steps":[1,5,12,30]},"lighthouse":{"name":"灯台","ranks":["浜辺の旅人","灯台守見習い","岬の航海士","灯台マスター"],"steps":[1,4,10,16]},"shrine":{"name":"神社","ranks":["参拝者","一之宮巡礼者","神域の旅人","鎮守の守護者"],"steps":[1,5,15,30]},"temple":{"name":"お寺","ranks":["巡礼ビギナー","古刹めぐり達人","霊場巡礼者","大先達"],"steps":[1,5,15,33]},"museum":{"name":"美術館","ranks":["アート散歩人","美の探究者","キュレーター","巨匠の眼"],"steps":[1,5,12,25]},"science":{"name":"博物館","ranks":["好奇心の旅人","フィールド研究者","博覧強記の博士","総合学術の巨頭"],"steps":[1,5,12,25]},"michinoeki":{"name":"道の駅","ranks":["道の駅ビギナー","街道の常連","スタンプラリー王者","全国道の駅マイスター"],"steps":[1,10,30,80]},"sapa":{"name":"SA/PA","ranks":["ハイウェイ初心者","週末ドライバー","サービスエリア通","高速道路の覇者"],"steps":[1,5,15,35]}};
@@ -1035,7 +1149,7 @@ ACT.longToggle = function(el) {
   el.textContent = on ? '閉じる' : '続きを読む';
   if (on) watchPhotos(box); else box.closest('article').scrollIntoView({ block: 'nearest' });
 };
-function catLine(x) { return '<span class="cats"><b>' + esc(x.category || '未分類') + '</b>' + (x.subCategory ? '<span>' + esc(x.subCategory) + '</span>' : '') + '</span>'; }
+function catLine(x) { var mk = MAP_MARK[x.category]; return '<span class="cats">' + (mk ? '<i class="cdot pin-' + mk[1] + '"></i>' : '') + '<b>' + esc(x.category || '未分類') + '</b>' + (x.subCategory ? '<span>' + esc(x.subCategory) + '</span>' : '') + '</span>'; }
 function scoreLine(x) {
   var l = catOf(x.category).scores, v = scoresOf(x);
   return l.length && v.some(function(s) { return s > 0; }) ? '<div class="scoreline">' + l.map(function(t, i) { return '<span>' + esc(t) + '<b>' + (v[i] || '—') + '</b></span>'; }).join('') + '</div>' : '';
@@ -1359,18 +1473,54 @@ function planDash() {
   var logs = store.list('log').filter(function(l) { return dateKey(l.timestamp).slice(0, 7) === cur; }), rated = logs.filter(function(l) { return l.rating > 0; }), n = {};
   logs.forEach(function(l) { n[l.category] = (n[l.category] || 0) + 1; });
   var top = Object.keys(n).sort(function(a, b) { return n[b] - n[a]; })[0] || '-';
-  var today = ymd(new Date()), hols = store.list('holiday').slice().sort(function(a, b) { return (a.startDate || '9') < (b.startDate || '9') ? -1 : 1; });
-  var up = hols.filter(function(h) { return !h.endDate && !h.startDate || dateKey(h.endDate || h.startDate).slice(0, 10) >= today; }), past = hols.filter(function(h) { return up.indexOf(h) < 0; }).reverse();
-  var hol = function(h) {
-    var s = toDate(h.startDate), days = s ? Math.ceil((s - new Date()) / 864e5) : null;
-    return '<div class="card tap" data-act="holEdit" data-id="' + esc(h.id) + '"><div class="row between"><h3>' + esc(h.name) + '</h3><span class="pill">' + esc(h.status) + '</span></div><div class="muted">' + esc(h.startDate) + (h.endDate ? ' 〜 ' + esc(h.endDate) : '') + (days > 0 ? '（あと ' + days + ' 日）' : '') + '</div>' + [h.destination, h.mainPlan, h.budget].filter(Boolean).map(function(t) { return '<div class="text">' + esc(t) + '</div>'; }).join('') + '</div>';
-  };
+  var hl = holidayLists();
   return '<div class="section"><button type="button" class="icon-btn" data-act="planMonth" data-v="-1" aria-label="前の月">' + icon('left') + '</button><h2>' + d.getFullYear() + '年' + (d.getMonth() + 1) + '月</h2><button type="button" class="icon-btn" data-act="planMonth" data-v="1" aria-label="次の月">' + icon('right') + '</button></div>' +
     '<div class="card kpi"><div><b>' + logs.length + '</b><span class="muted">記録</span></div><div><b>' + (rated.length ? (rated.reduce(function(s, l) { return s + l.rating; }, 0) / rated.length).toFixed(1) : '-') + '</b><span class="muted">平均評価</span></div><div><b class="ell">' + esc(top) + '</b><span class="muted">いちばん多い</span></div></div>' +
     '<div class="section"><h3>今月の目標</h3><button type="button" class="btn small" data-act="goalAdd" data-v="月間">追加</button></div>' + goalRows(goals.filter(function(g) { return g.periodType !== '年間' && goalYm(g.targetYm) === cur; }), 'この月の目標はまだありません') +
     '<div class="section"><h3>' + y + '年の目標</h3><button type="button" class="btn small" data-act="goalAdd" data-v="年間">追加</button></div>' + goalRows(goals.filter(function(g) { return g.periodType === '年間' && goalYm(g.targetYm).slice(0, 4) === y; }), '年間の目標はまだありません') +
-    '<div class="section"><h3>連休・長期休み</h3><button type="button" class="btn small" data-act="holEdit">追加</button></div>' + (up.map(hol).join('') || '<p class="muted">これからの予定はありません</p>') + (past.length ? '<details><summary class="muted">過去の連休 ' + past.length + ' 件</summary>' + past.map(hol).join('') + '</details>' : '');
+    '<div class="section"><h3>連休・長期休み</h3><span class="row"><button type="button" class="btn small" data-act="autoSet">自動表示</button><button type="button" class="btn small" data-act="holEdit">追加</button></span></div>' +
+    (hl.up.length ? '<div class="hlist">' + hl.up.map(holRow).join('') + '</div>' : '<p class="muted">これからの予定はありません</p>') +
+    (hl.past.length ? '<details><summary class="muted">過去の連休 ' + hl.past.length + ' 件</summary><div class="hlist">' + hl.past.map(holRow).join('') + '</div></details>' : '');
 }
+
+// ---- 連休: 登録したもの＋自動で出すもの（自動のものは保存しない。押すと予定として登録できる） ----
+var YEARLY = '毎年';
+function autoPrefs() { return Object.assign({}, AUTO_DEFAULT, prefs().auto || {}); }
+function holidayLists() {
+  var now = new Date(), today = ymd(now), all = store.list('holiday'), yearly = all.filter(function(h) { return h.repeat === YEARLY; });
+  var plain = all.filter(function(h) { return h.repeat !== YEARLY; }).map(function(h) { return { rec: h, startDate: dateKey(h.startDate).slice(0, 10), endDate: dateKey(h.endDate).slice(0, 10) }; });
+  var mine = plain.map(function(r) { return [r.startDate, r.endDate || r.startDate]; });
+  var hit = function(a) { var s = a.startDate, e = a.endDate || a.startDate; return mine.some(function(m) { return m[0] && m[0] <= e && m[1] >= s; }); };
+  var auto = autoPlans(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 366, autoPrefs(), yearly)
+    .filter(function(a) { return a.kind === 'yearly' || a.kind === 'event' ? !plain.some(function(r) { return r.startDate === a.startDate && r.rec.name === a.name; }) : !hit(a); });
+  PV.auto = {};
+  auto.forEach(function(a) { PV.auto[a.key] = a; });
+  var up = plain.filter(function(r) { return !r.startDate || (r.endDate || r.startDate) >= today; }).concat(auto);
+  up.sort(function(a, b) { return (a.startDate || '9') < (b.startDate || '9') ? -1 : (a.startDate || '9') > (b.startDate || '9') ? 1 : 0; });
+  return { up: up, past: plain.filter(function(r) { return up.indexOf(r) < 0; }).sort(function(a, b) { return a.startDate < b.startDate ? 1 : -1; }) };
+}
+// 細い 1 行: 日付・名前・補足・状態
+function holRow(r) {
+  var h = r.rec, s = r.startDate ? toDate(r.startDate) : null, e = r.endDate ? toDate(r.endDate) : null, wd = function(d) { return '日月火水木金土'[d.getDay()]; };
+  var dcls = function(d) { return d.getDay() === 6 ? 'sat' : d.getDay() === 0 || holidayName(d) ? 'sun' : ''; };
+  var len = s && e ? Math.round((e - s) / 864e5) + 1 : 0, left = s ? Math.ceil((s - new Date(new Date().setHours(0, 0, 0, 0))) / 864e5) : null;
+  var sub = [len > 1 ? (s.getMonth() + 1) + '/' + s.getDate() + '〜' + (e.getMonth() + 1) + '/' + e.getDate() + '・' + len + '日' : '', left > 0 ? 'あと' + left + '日' : left === 0 || (left < 0 && e && e >= new Date(new Date().setHours(0, 0, 0, 0))) ? '今日' : ''];
+  var date = s ? '<span class="hdate ' + dcls(s) + '"><b>' + (s.getMonth() + 1) + '/' + s.getDate() + '</b><small>' + wd(s) + '</small></span>' : '<span class="hdate"><b>未定</b></span>';
+  if (h) return '<div class="hrow tap" data-act="holEdit" data-id="' + esc(h.id) + '">' + date + '<div class="grow"><div class="ell"><b>' + esc(h.name) + '</b></div><div class="muted ell">' + esc(sub.concat([h.destination, h.mainPlan]).filter(Boolean).join('・')) + '</div></div><span class="pill' + (h.status === '手配済' ? ' green' : h.status === '計画中' ? ' gold' : '') + '">' + esc(h.status || '') + '</span></div>';
+  var kind = { long: '連休', bridge: '休めば', event: '行事', yearly: '毎年' }[r.kind];
+  return '<div class="hrow auto k-' + r.kind + ' tap" data-act="holAuto" data-key="' + esc(r.key) + '">' + date + '<div class="grow"><div class="ell"><b>' + esc(r.name) + '</b></div><div class="muted ell">' + esc(sub.concat([r.note]).filter(Boolean).join('・')) + '</div></div><span class="hk">' + kind + '</span></div>';
+}
+// 自動の候補から予定を作る
+ACT.holAuto = function(el) {
+  var a = PV.auto && PV.auto[el.dataset.key];
+  if (a && a.kind === 'yearly') holForm(store.get('holiday', a.id));
+  else if (a) holForm(null, { name: a.kind === 'bridge' ? a.note + '（' + a.days + '連休）' : a.name, startDate: a.startDate, endDate: a.endDate, status: HOL_STATUS[0] });
+};
+ACT.autoSet = function() {
+  var p = autoPrefs();
+  openSheet('連休・行事の自動表示', '<p class="muted">祝日と土日から計算して、連休・長期休みの一覧に候補を出します。押すと予定として登録できます。</p><div class="card list">' + AUTO_KINDS.map(function(k) { return '<label class="item swrow"><span class="grow">' + esc(k[1]) + '</span><input type="checkbox" data-change="autoKind" data-k="' + k[0] + '"' + (p[k[0]] ? ' checked' : '') + '></label>'; }).join('') + '</div><p class="muted">誕生日や記念日は「追加」で登録し、繰り返しを「毎年」にしてください。この表示の設定は端末ごとです。</p>');
+};
+INPUT.autoKind = function(el) { var p = prefs().auto || {}; p[el.dataset.k] = el.checked; setPref('auto', p); if (APP.tab === 'plan') RENDER.plan(); };
 ACT.planMonth = function(el) { PV.date = new Date(PV.date.getFullYear(), PV.date.getMonth() + Number(el.dataset.v), 1); RENDER.plan(); };
 ACT.goalDone = function(el) { var g = store.get('goal', el.dataset.id), d = !isDone(g.status); store.patch('goal', g.id, { status: d ? '達成' : '未達成', progress: d ? 100 : 0 }); };
 function goalForm(g, period) {
@@ -1389,14 +1539,14 @@ function goalForm(g, period) {
 }
 ACT.goalAdd = function(el) { goalForm(null, el.dataset.v); };
 ACT.goalEdit = function(el) { goalForm(store.get('goal', el.dataset.id)); };
-ACT.holEdit = function(el) {
-  var h = el.dataset.id ? store.get('holiday', el.dataset.id) : null;
-  openForm({ title: h ? '連休を編集' : '連休を追加', values: h || { status: HOL_STATUS[0] }, fields: [{ k: 'name', label: '連休名', required: true }, { k: 'startDate', label: '開始', type: 'date', half: true }, { k: 'endDate', label: '終了', type: 'date', half: true }, { k: 'status', label: '状態', type: 'select', options: HOL_STATUS, half: true }, { k: 'budget', label: '予算目安', half: true }, { k: 'destination', label: '行き先' }, { k: 'mainPlan', label: 'メインの予定', type: 'textarea' }, { k: 'memo', label: 'メモ', type: 'textarea' }],
+ACT.holEdit = function(el) { holForm(el.dataset.id ? store.get('holiday', el.dataset.id) : null); };
+function holForm(h, init) {
+  openForm({ title: h ? '連休を編集' : '連休を追加', values: h || init || { status: HOL_STATUS[0] }, fields: [{ k: 'name', label: '名前（連休名・誕生日など）', required: true }, { k: 'startDate', label: '開始', type: 'date', half: true }, { k: 'endDate', label: '終了', type: 'date', half: true }, { k: 'status', label: '状態', type: 'select', options: HOL_STATUS, half: true }, { k: 'repeat', label: '繰り返し', type: 'select', options: [['', 'しない'], [YEARLY, '毎年（誕生日・記念日）']], half: true }, { k: 'budget', label: '予算目安', half: true }, { k: 'destination', label: '行き先' }, { k: 'mainPlan', label: 'メインの予定', type: 'textarea' }, { k: 'memo', label: 'メモ', type: 'textarea' }],
     onDelete: h ? function() { trashItem('holiday', h.id, '連休'); } : null, onSave: function(val) {
       if (val.startDate && val.endDate && val.endDate < val.startDate) { toast('終了日が開始日より前です'); return false; }
       if (h) saveEdited('holiday', h, val); else store.add('holiday', val);
     } });
-};
+}
 
 
 // ---- やりたいこと100 ----
@@ -1561,17 +1711,21 @@ INPUT.memoQ = function(el) { MV.q = el.value.trim(); RENDER.memoList(); };
 ACT.memoMore = function() { MV.shown += 40; RENDER.memoList(); };
 
 // サーバー経由で題名を取る。待っている間に書き換えた欄は上書きしない
-ACT.fetchMeta = function(el) {
-  var f = el.form, url = safeUrl(f.elements.url.value);
-  if (!/^https:/i.test(url)) { toast('https の URL を入力してください'); return; }
-  el.disabled = true;
-  callApi('fetchWebMetadata', { url: url }).then(function(r) {
+ACT.fetchMeta = function(el) { fillMeta(el.form, el, false); };
+// quiet: 共有から開いたときの自動取得（失敗しても知らせない。題名が URL だけなら置き換える）
+function fillMeta(f, el, quiet) {
+  var url = safeUrl(f.elements.url.value), title = f.elements.title;
+  if (!/^https:/i.test(url)) { if (!quiet) toast('https の URL を入力してください'); return Promise.resolve(); }
+  if (el) el.disabled = true;
+  var before = title.value, isUrl = /^\s*https?:\/\//.test(before);
+  if (quiet) title.placeholder = '題名を取得しています…';
+  return callApi('fetchWebMetadata', { url: url }).then(function(r) {
     var body = f.elements.body || f.elements.note;
-    if (r.title && !f.elements.title.value) f.elements.title.value = r.title;
+    if (r.title && (!title.value || (isUrl && title.value === before))) title.value = r.title;
     if (r.description && body && !body.value) body.value = r.description;
-    if (!r.title) toast('題名が見つかりません');
-  }).catch(function(e) { toast(e.message); }).then(function() { el.disabled = false; });
-};
+    if (!r.title && !quiet) toast('題名が見つかりません');
+  }).catch(function(e) { if (!quiet) toast(e.message); }).then(function() { if (el) el.disabled = false; title.placeholder = ''; });
+}
 
 // ============================================================
 // Mod_Out : おでかけ（スタンプ帳・道路・記念カード・お気に入り）。ふたりで共有する
@@ -1964,23 +2118,33 @@ SUBMIT.handover = function(f) {
 };
 
 // ---- 共有メニュー（Android）。Service Worker が端末内に置いたものを受け取る ----
+// iPhone のショートカットなどからは ?share=1&url=…&title=…&text=… で受け取る
 function takeShared() {
-  if (!/[?&]share=1/.test(location.search) || !window.caches) return;
+  if (!/[?&]share=1/.test(location.search)) return;
+  var qs = new URLSearchParams(location.search), get = { title: qs.get('title') || '', text: qs.get('text') || '', url: qs.get('url') || '' };
   history.replaceState(null, '', './');
+  if (get.title || get.text || get.url) { openShared(get, []); return; }
+  if (!window.caches) return;
   caches.open('couplelog-inbox').then(function(c) {
     return c.match('./inbox.json').then(function(r) { return r ? r.json() : null; }).then(function(info) {
       if (!info) return;
       return Promise.all((info.files || []).map(function(k) { return c.match(k).then(function(r) { return r && r.blob(); }); })).then(function(blobs) {
         return Promise.all(blobs.filter(Boolean).map(function(b) { return preparePhoto(b).then(function(p) { return p.id; }, function() { return null; }); }));
       }).then(function(ids) {
-        ids = ids.filter(Boolean);
-        var text = [info.text, info.url].filter(Boolean).join('\n'), m = text.match(/https?:\/\/\S+/), rest = text.replace(m ? m[0] : '', '').trim();
-        if (ids.length) openLogForm({ preset: { title: info.title || '', memo: text }, photos: ids });
-        else noteForm(null, { title: info.title || '', url: m ? m[0] : '', body: rest });
+        openShared(info, ids.filter(Boolean));
         return caches.delete('couplelog-inbox');
       });
     });
   }).catch(function(e) { console.warn(e); });
+}
+
+// 写真があればログ、なければメモ。URL があれば題名を自動で取る（YouTube は動画名とチャンネル名）
+function openShared(info, ids) {
+  var s = sharedParts(info);
+  if (ids.length) { openLogForm({ preset: { title: s.title, memo: s.text }, photos: ids }); return; }
+  noteForm(null, { title: s.title, url: s.url, body: s.rest });
+  var f = topSheet() && topSheet().querySelector('form');
+  if (f && s.fetch) fillMeta(f, null, true);
 }
 
 document.querySelectorAll('[data-icon]').forEach(function(b) { b.insertAdjacentHTML('afterbegin', icon(b.dataset.icon)); });
